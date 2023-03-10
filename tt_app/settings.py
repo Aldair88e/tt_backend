@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 """
 
 from pathlib import Path
+import os
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -27,6 +28,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+REACT_ROUTES = [
+    r'^reestablecer/*/*/',
+    r'^priv/*',
+]
 
 # Application definition
 
@@ -44,8 +49,10 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'dj_rest_auth',
     'dj_rest_auth.registration',
-    'usuarios.apps.UsuariosConfig',
     'corsheaders',
+    'django_postalcodes_mexico.apps.DjangoPostalcodesMexicoConfig',
+    'indexServerApp',
+    'usuarios',
 ]
 
 #Necesario para la biblioteca allauth
@@ -67,7 +74,9 @@ ROOT_URLCONF = 'tt_app.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [
+            os.path.join(BASE_DIR, 'usuarios/templates')
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -133,8 +142,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
-STATIC_URL = 'static/'
-
+STATIC_URL = '/static/'
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
@@ -170,15 +178,25 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_UNIQUE_EMAIL = True
 
 #Sin confirmacion por email
-ACCOUNT_EMAIL_VERIFICATION = 'none'
+#ACCOUNT_EMAIL_VERIFICATION = 'none'
 
 #decirle a la biblioteca que use el serializador creado por nosotros
 REST_AUTH_REGISTER_SERIALIZERS = {
     'REGISTER_SERIALIZER': 'usuarios.serializers.CustomRegisterSerializer',
 }
 
-#Configuraciones CORS
+REST_AUTH_SERIALIZERS = {
+    'PASSWORD_RESET_SERIALIZER': 'usuarios.serializers.MyPasswordResetSerializer',
+}
 
+CUSTOM_PASSWORD_RESET_CONFIRM = 'reestablecer/'
+
+
+#Usar contraseña anterior al modificar contraseña
+OLD_PASSWORD_FIELD_ENABLED = True
+
+
+#Configuraciones CORS
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
 ]

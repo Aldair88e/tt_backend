@@ -42,3 +42,6 @@ class Mype(models.Model):
     descripcion = models.TextField()
     telefono = models.CharField(max_length=10)
     direcciones = models.ManyToManyField(Direccion, blank=True)
+    facebook = models.URLField(blank=True)
+    twitter = models.URLField(blank=True)
+    instagram = models.URLField(blank=True)

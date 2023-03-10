@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from .models import Usuario, Cliente, Direccion, Mype
 from django.shortcuts import get_object_or_404
-from .serializers import UsuarioSerializer, RegistroClienteSerializer, DireccionSerializer, UpdateClienteSerializer, RegistroMypeSerializer, ClientePutSerializer, DireccionPutSerializer, MypeSerializer, PutMypeSerializer
+from .serializers import UsuarioSerializer, RegistroClienteSerializer, DireccionSerializer, UpdateClienteSerializer, RegistroMypeSerializer, ClientePutSerializer, DireccionPutSerializer, MypeSerializer, PutMypeSerializer, getClienteSerializer, getMypeSerializer
 from rest_framework.parsers import JSONParser
 from django.http import JsonResponse
 from rest_framework.renderers import JSONRenderer
@@ -17,6 +17,28 @@ class user_haveData(views.APIView):
     def get(self, request):
         user = get_object_or_404(Usuario, username=self.request.user)
         serializer = UsuarioSerializer(user)
+        if user.is_mype and user.have_data:
+            mype =user.mype
+            # serializerMype = getMypeSerializer(mype)
+            # print(serializerMype.data)
+            response = {
+                "id": user.id, 
+                "is_mype" : user.is_mype,
+                "have_data" : user.have_data,
+                "nombre" : mype.nombreEmpresa
+            }
+            return Response(response)
+        elif user.have_data and not(user.is_mype):
+            cliente = user.cliente
+            # serializerCliente = getClienteSerializer(cliente)
+            # print(serializerCliente.data)
+            response = {
+                "id": user.id, 
+                "is_mype" : user.is_mype,
+                "have_data" : user.have_data,
+                "nombre" : cliente.nombre
+            }
+            return Response(response)
         print(serializer.data)
         return Response(serializer.data)
 
@@ -26,11 +48,12 @@ class clienteRegistro(views.APIView):
 
     def post(self, request):
         data = JSONParser().parse(request)
+        user = get_object_or_404(Usuario, username=self.request.user)
         serializer = RegistroClienteSerializer(data=data)
         if serializer.is_valid():
             cliente_data = serializer.validated_data['cliente']
             direccion_data = serializer.validated_data['direccion']
-            cli = Cliente.objects.create(**cliente_data)
+            cli = Cliente.objects.create(usuario=user, **cliente_data)
             direccion = Direccion.objects.create(**direccion_data)
             cli.direcciones.add(direccion)
             print(cli)
@@ -40,6 +63,7 @@ class clienteRegistro(views.APIView):
             usuario.save()
             userSerializer = UsuarioSerializer(usuario)
             return JsonResponse(userSerializer.data, status=201)
+        print(serializer.errors)
         return JsonResponse(serializer.errors, status=400)
 
     def get(self, request):

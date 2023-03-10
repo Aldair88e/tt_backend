@@ -1,0 +1,16 @@
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=UTF-8"/>
+        <title>Reestablecimiento de contraseña</title>
+    </head>
+    <body>
+        <h2>Hola</h2>
+        <p><b>Este correo eléctronico ha sido enviado debido a que solicitaste el reestablecimiento de tu contraseña</b></p>
+        <p>Por favor, ve al siguiente enlace y crea una nueva contraseña:</p>
+        <p>{{ protocol }}://{{ domain}}{% url 'password_reset_confirm' uidb64=uid token=token %}</p>
+        <p>Recuerda que la contraseña debe tener una loongitud de 8 a 20 caracters y debe contener al menos una letra mayúscula, una minúscula y uno de los siguientes caracteres @$!%*?&/+=-_</p>
+        <p>
+            Si tu no has solicitado el reestablecimiento de tu contraseña has caso omiso a este mensaje.
+        </p>
+    </body>
+</html>

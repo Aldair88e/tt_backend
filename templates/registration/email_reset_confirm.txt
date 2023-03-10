@@ -1,0 +1,10 @@
+{% extends "account/email/base_message.txt" %}
+{% load i18n %}
+{% load password_reset_template_load %}
+
+{% block content %}{% autoescape off %}{% blocktrans %}Hola, este correo ha sido enviado debido a que has solicitado el reestablecimiento de tu contraseña.
+Si tu no has sido quien solicito el reestablecimiento puedes ignorar este mensaje.{% endblocktrans %}
+
+{% get_settings_var 'CUSTOM_PASSWORD_RESET_CONFIRM' %}?uidb64={{ uid }}&token={{ token }}
+
+{% blocktrans %}In case you forgot, your username is {{ username }}.{% endblocktrans %}{% endif %}{% endautoescape %}{% endblock %}
