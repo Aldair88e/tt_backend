@@ -56,8 +56,6 @@ class clienteRegistro(views.APIView):
             cli = Cliente.objects.create(usuario=user, **cliente_data)
             direccion = Direccion.objects.create(**direccion_data)
             cli.direcciones.add(direccion)
-            print(cli)
-            print(direccion)
             usuario = cli.usuario
             usuario.have_data = True
             usuario.save()

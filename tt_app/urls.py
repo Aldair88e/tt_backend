@@ -21,6 +21,8 @@ from django_postalcodes_mexico import urls as django_postalcodes_mexico_urls
 from django.conf import settings
 from django.conf.urls.static import static
 from indexServerApp import views
+from GestionInventario.views import MobiliarioRegistro, MobiliarioMantenimientoView, MobiliarioShortview
+# from GestionInventario import views as InventarioViews
 
 react_routes = getattr(settings, 'REACT_ROUTES', [])
 urlpatterns = [
@@ -35,7 +37,12 @@ urlpatterns = [
             name='password_reset_confirm'),
     path('CP/', include(django_postalcodes_mexico_urls)),
     path('', views.index, name='home'),
+    path('mobiliario/', MobiliarioRegistro.as_view(), name='mobiliarioRegistro'),
+    path('api/mantenimiento/', MobiliarioMantenimientoView.as_view(), name='mantenimiento'),
+    path('api/mobiliario/short/', MobiliarioShortview.as_view(), name='mobiliario_short'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+urlpatterns += static(settings.MEDIA_URL, document_root = settings.MEDIA_ROOT)
 
 
 

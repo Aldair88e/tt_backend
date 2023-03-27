@@ -53,6 +53,8 @@ INSTALLED_APPS = [
     'django_postalcodes_mexico.apps.DjangoPostalcodesMexicoConfig',
     'indexServerApp',
     'usuarios',
+    'GestionInventario',
+    'django_cleanup.apps.CleanupConfig',
 ]
 
 #Necesario para la biblioteca allauth
@@ -143,6 +145,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.1/howto/static-files/
 
 STATIC_URL = '/static/'
+
+#Media
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_URL = '/media/'
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.1/ref/settings/#default-auto-field
 
