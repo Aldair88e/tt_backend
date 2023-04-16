@@ -1,12 +1,13 @@
 from rest_framework import serializers
-from .models import Mobiliario, MobiliarioEnMantenimiento
+from .models import Mobiliario, MobiliarioEnMantenimiento, MobiliarioPerdido
 
 class MobiliarioSerializer(serializers.ModelSerializer):
     imagen = serializers.ImageField(max_length=None, use_url=True)
     total_mantenimiento = serializers.IntegerField(allow_null=True)
+    total_perdido = serializers.IntegerField(allow_null=True)
     class Meta:
         model = Mobiliario
-        fields = ['imagen', 'nombre', 'id', 'total', 'precioCompra', 'precioRenta', 'proveedor', 'total_mantenimiento', 'descripcion']
+        fields = ['imagen', 'nombre', 'id', 'total', 'precioCompra', 'precioRenta', 'proveedor', 'total_mantenimiento', 'descripcion', 'total_perdido']
 
 
 class MobiliarioShortSerializer(serializers.ModelSerializer):
@@ -17,6 +18,7 @@ class MobiliarioShortSerializer(serializers.ModelSerializer):
         
 
 class MobiliarioMantenimientoSerializer(serializers.ModelSerializer):
+    fechaFin = serializers.DateField(allow_null=True)
     class Meta:
         model = MobiliarioEnMantenimiento
         fields = ['cantidad', 'fechaFin', 'fechaInicio']
@@ -43,5 +45,42 @@ class MantenimientoPutSerializer(serializers.ModelSerializer):
         model = MobiliarioEnMantenimiento
         fields = ['id', 'cantidad', 'fechaFin']
 
-# class MobiliarioGetInfoSerializer(serializers.Serializer):
-#     mobiliario = MobiliarioSerializer()
+class MobiliarioPerdidoBaseSerializer(serializers.ModelSerializer):
+    def validate(self, data):
+        if data['totalReposicion'] is not None:
+            if data['totalReposicion'] < 0:
+                raise serializers.ValidationError("No se permiten valores negativos")
+        if data['pagoRecibido'] is not None:
+            if data['pagoRecibido'] < 0:
+                raise serializers.ValidationError("No se permiten valores negativos")
+        return data
+    
+    class Meta:
+        model = MobiliarioPerdido
+        exclude = ['mobiliario', 'id', 'cliente', 'fecha']
+
+
+class MobiliarioPerdidoRegistroSerializer(serializers.Serializer):
+    mobiliarioPerdido = MobiliarioPerdidoBaseSerializer()
+    mobiliario = serializers.IntegerField()
+    cliente =  serializers.IntegerField(allow_null=True)
+
+class MobiliarioPerdidoPutSerializer(serializers.Serializer):
+    mobiliarioPerdido = MobiliarioPerdidoBaseSerializer()
+    id = serializers.IntegerField()
+    
+class MobiliarioPerdidoGetSerializer(serializers.ModelSerializer):
+    mobiliario = serializers.StringRelatedField() 
+    cliente = serializers.StringRelatedField()
+    class Meta:
+        model = MobiliarioPerdido
+        fields = '__all__'
+        read_only_fields = ['mobiliario', 'id', 'cliente', 'fecha']
+
+class MobiliarioPerdidoPorClienteSerializer(serializers.ModelSerializer):
+    mobiliario = serializers.StringRelatedField()
+    class Meta:
+        model = MobiliarioPerdido
+        exclude = ['cliente']
+        read_only_fields = ['mobiliario', 'id', 'fecha']
+

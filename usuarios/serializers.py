@@ -32,7 +32,6 @@ class UsuarioSerializer(serializers.ModelSerializer):
 
 
 class ClienteSerializer(serializers.ModelSerializer):
-    usuario = serializers.PrimaryKeyRelatedField(many = False, queryset = Usuario.objects.all())
     class Meta:
         model = Cliente
         exclude = ['direcciones']
@@ -41,7 +40,7 @@ class ClienteSerializer(serializers.ModelSerializer):
 class ClientePutSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cliente
-        exclude = ['direcciones', 'usuario']
+        exclude = ['direcciones']
         
 class DireccionPutSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField()

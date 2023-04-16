@@ -3,9 +3,9 @@ from rest_framework.response import Response
 from rest_framework import views
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
-from usuarios.models import Usuario
-from .models import Mobiliario, MobiliarioEnMantenimiento
-from .serializers import MobiliarioSerializer, MobiliarioMantenimientoFullSerializer, MantenimientoOnGetSerializer, MantenimientoDelete, MantenimientoPutSerializer, MobiliarioShortSerializer
+from usuarios.models import Usuario, Cliente
+from .models import Mobiliario, MobiliarioEnMantenimiento, MobiliarioPerdido
+from .serializers import MobiliarioSerializer, MobiliarioMantenimientoFullSerializer, MantenimientoOnGetSerializer, MantenimientoDelete, MantenimientoPutSerializer, MobiliarioShortSerializer, MobiliarioPerdidoRegistroSerializer, MobiliarioPerdidoPutSerializer, MobiliarioPerdidoGetSerializer
 from django.http import JsonResponse
 from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
@@ -97,7 +97,11 @@ class MobiliarioRegistro(views.APIView):
         usuario = get_object_or_404(Usuario, username= self.request.user)
         if usuario.is_mype:
             mypeObject = usuario.mype
-            mobiliario = mypeObject.mobiliario_set.annotate(total_mantenimiento = Sum('mobiliarioenmantenimiento__cantidad'))
+            mobiliario = mypeObject.mobiliario_set.annotate(
+                total_mantenimiento = Sum('mobiliarioenmantenimiento__cantidad')
+                ).annotate(
+                total_perdido = Sum('mobiliarioperdido__cantidad')
+                )
             serializer = MobiliarioSerializer(mobiliario, many=True)
             jsonData = JSONRenderer().render(serializer.data)
             return Response(jsonData, status=200)
@@ -110,7 +114,6 @@ class MobiliarioRegistro(views.APIView):
         user = get_object_or_404(Usuario, username = self.request.user)
         if user.is_mype:
             mypeObject = user.mype
-            print(request.POST)
             datos = request.POST
             mobiliarioObject = mypeObject.mobiliario_set.filter(id=datos.get('id'))[0]
             # mobiliarioObject = get_object_or_404(Mobiliario, id = datos.get('id'))
@@ -155,7 +158,6 @@ class MobiliarioRegistro(views.APIView):
                 mobiliarioObject.imagen = imagen
             mobiliarioObject.save()
             serializer = MobiliarioSerializer(mobiliarioObject)
-            print(serializer.data)
             return JsonResponse(serializer.data, status=200)
         response = {
             'usuario' : 'El usuario no es de tipo MYPE',
@@ -167,7 +169,6 @@ class MobiliarioRegistro(views.APIView):
         if user.is_mype:
             mypeObject = user.mype
             data = JSONParser().parse(request)
-            print(data.get('id'))
             instances = mypeObject.mobiliario_set.filter(id=data.get('id'))
             if instances.exists():
                 for instance in instances:
@@ -188,7 +189,9 @@ class MobiliarioRegistro(views.APIView):
 class MobiliarioMantenimientoView(views.APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-
+    NO_MY_PERESPONSE = {
+        'usuario':'El usuario no es de tipo MYPE'
+    }
 
 
     def post(self, request):
@@ -196,24 +199,27 @@ class MobiliarioMantenimientoView(views.APIView):
         if usuario.is_mype:
             data = JSONParser().parse(request)
             serializer = MobiliarioMantenimientoFullSerializer(data=data)
-            print(data)
             if serializer.is_valid():
                 mobiliarioDatos = serializer.validated_data['mobiliario']
                 mantenimientoDatos = serializer.validated_data['mobiliarioMantenimiento']
                 try:
-                    mobiliarioInstancia = Mobiliario.objects.annotate(total_mantenimiento=Sum('mobiliarioenmantenimiento__cantidad')).get(id=mobiliarioDatos['id'])
-                    if mobiliarioInstancia.total_mantenimiento is None:
-                        if (mobiliarioInstancia.total-int(mantenimientoDatos['cantidad'])) < 0:
-                            response = {
-                                "Overflow":"La cantidad de mobiliario en mantenimiento no puede superar al total del mobiliario",
-                            }
-                            return Response(response, status=400)
-                    else:
-                        if (mobiliarioInstancia.total-int(mantenimientoDatos['cantidad']) - mobiliarioInstancia.total_mantenimiento) < 0:
-                            response = {
-                                "Overflow":"La cantidad de mobiliario en mantenimiento no puede superar al total del mobiliario",
-                            }
-                            return Response(response, status=400)     
+                    mobiliarioInstancia = Mobiliario.objects.annotate(
+                            total_mantenimiento=Sum('mobiliarioenmantenimiento__cantidad')
+                        ).annotate(
+                            total_perdido=Sum('mobiliarioperdido__cantidad')
+                        ).get(id=mobiliarioDatos['id'])
+                    
+                    totalMantenimiento = 0
+                    totalPerdido = 0
+                    if mobiliarioInstancia.total_mantenimiento is not None:
+                        totalMantenimiento = mobiliarioInstancia.total_mantenimiento
+                    if mobiliarioInstancia.total_perdido is not None:
+                        totalPerdido = mobiliarioInstancia.total_perdido
+                    if (mobiliarioInstancia.total-int(mantenimientoDatos['cantidad'])-totalPerdido-totalMantenimiento) < 0:
+                        response = {
+                            "Error": "El total del mobiliario es suficiente para realizar esta operacion",
+                        }
+                        return Response(response, status=400)    
                     mantenimientoInstancia = MobiliarioEnMantenimiento.objects.create(mobiliario=mobiliarioInstancia, **mantenimientoDatos)  
                     response = {
                         "respuesta":"El mobiliario se puso en mantenimiento",
@@ -221,11 +227,8 @@ class MobiliarioMantenimientoView(views.APIView):
                     return Response(response, status=201)
                 except Mobiliario.DoesNotExist:
                     raise Http404()
-            return JsonResponse(serializer.errors, status=400)
-        response = {
-            'usuario':'El usuario no es de tipo MYPE'
-        } 
-        return Response(response, status=400)
+            return JsonResponse(serializer.errors, status=400) 
+        return Response(self.NO_MY_PERESPONSE, status=400)
 
     def get(self, request):
         usuario = get_object_or_404(Usuario, username= self.request.user)
@@ -235,7 +238,6 @@ class MobiliarioMantenimientoView(views.APIView):
             qs = MobiliarioEnMantenimiento.objects.select_related('mobiliario').all()
             qr = qs.filter(mobiliario_id__in=qs1)
             serializer = MantenimientoOnGetSerializer(qr, many=True)
-            print(serializer.data)
             jsonData = JSONRenderer().render(serializer.data)
             return Response(jsonData, status=200)
         response = {
@@ -267,17 +269,159 @@ class MobiliarioMantenimientoView(views.APIView):
             data = JSONParser().parse(request)
             serializer = MantenimientoPutSerializer(data=data)
             if serializer.is_valid():
-                idM = serializer.validated_data['id']
-                mantenimientoInstancia = get_object_or_404(MobiliarioEnMantenimiento, id=idM)
-                mantenimientoInstancia.cantidad = serializer.validated_data['cantidad']
-                mantenimientoInstancia.fechaFin = serializer.validated_data['fechaFin']
-                mantenimientoInstancia.save()
-                response = {
-                    "resultado": "La operación ser realizó con éxito",
-                }
-                return Response(response, status=200)
+                try:
+                    idM = serializer.validated_data['id']
+                    cantidad = serializer.validated_data['cantidad']
+                    fechaFin = serializer.validated_data['fechaFin']
+                    mantenimientoInstancia = get_object_or_404(MobiliarioEnMantenimiento, id=idM)
+                    cantidadActual = mantenimientoInstancia.cantidad
+                    mobiliario = Mobiliario.objects.annotate(
+                            total_mantenimiento=Sum('mobiliarioenmantenimiento__cantidad')
+                        ).annotate(
+                            total_perdido=Sum('mobiliarioperdido__cantidad')
+                        ).get(id=mantenimientoInstancia.mobiliario.id)
+                    totalMantenimiento = 0
+                    totalPerdido = 0
+                    if mobiliario.total_mantenimiento is not None:
+                        totalMantenimiento = mobiliario.total_mantenimiento
+                    if mobiliario.total_perdido is not None:
+                        totalPerdido = mobiliario.total_perdido
+                    if (mobiliario.total+cantidadActual-cantidad-totalPerdido-totalMantenimiento) < 0:
+                        response = {
+                            "Error": "El total del mobiliario es insuficiente para realizar esta operacion",
+                        }
+                        return Response(response, status=400)
+                    
+                    if mantenimientoInstancia.fechaInicio> fechaFin:
+                        response = {
+                            "Error": "La fecha de finalización no puede ocurrir antes que la fecha en que se registró el mobiliario en mantenimiento",
+                        }
+                        return Response(response, status=400)
+                    mantenimientoInstancia.cantidad = cantidad
+                    mantenimientoInstancia.fechaFin = fechaFin
+                    mantenimientoInstancia.save()
+                    response = {
+                        "resultado": "La operación ser realizó con éxito",
+                    }
+                    return Response(response, status=200)
+                except Mobiliario.DoesNotExist:
+                    raise Http404()
             return JsonResponse(serializer.errors, status=400)
         response = {
             'usuario':'El usuario no es de tipo MYPE'
         } 
         return Response(response, status=400)
+    
+class MobiliarioPerdidoView(views.APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+    NO_MY_PERESPONSE = {
+        'usuario':'El usuario no es de tipo MYPE'
+    }
+    TOTAL_INSUFICIENTE = {
+        "Error": "El total del mobiliario es suficiente para realizar esta operacion",
+    }
+    NO_SE_ENCOTRO = {
+        "Error": "No se encontro el registro indicado",
+    }
+
+    def post(self, request):
+        usuario = get_object_or_404(Usuario, username= self.request.user)
+        if usuario.is_mype:
+            mype = usuario.mype
+            data = JSONParser().parse(request)
+            serializer = MobiliarioPerdidoRegistroSerializer(data=data) 
+            if serializer.is_valid():
+                mobPerd = serializer.validated_data['mobiliarioPerdido']
+                mobiliario_id = serializer.validated_data['mobiliario']
+                cliente_id = serializer.validated_data['cliente']
+                mobiliario = mype.mobiliario_set.annotate(
+                    total_perdido=Sum('mobiliarioperdido__cantidad')
+                    ).annotate(
+                    total_mantenimiento=Sum('mobiliarioenmantenimiento__cantidad')
+                    ).filter(id=mobiliario_id)
+                cliente = get_object_or_404(Cliente, id=cliente_id)
+                if mobiliario.exists():
+                    for m in mobiliario:
+                        totalPerdido = 0
+                        totalMantenimiento = 0
+                        if m.total_perdido is not None:
+                            totalPerdido = m.total_perdido
+                        if m.total_mantenimiento is not None:
+                            totalMantenimiento = m.total_mantenimiento
+                        if (m.total - totalPerdido - totalMantenimiento) < 0:
+                            return Response(self.TOTAL_INSUFICIENTE, status=400)
+                        mobPerdido = MobiliarioPerdido.objects.create(mobiliario=m, cliente = cliente, **mobPerd)  
+                        response = {
+                            "respuesta":"El mobiliario se registró como perdido",
+                        }
+                        return Response(response, status=201)
+                return Response(self.NO_SE_ENCOTRO, status=404)
+            return JsonResponse(serializer.errors, status=400)
+        return Response(self.NO_MY_PERESPONSE, status=403)
+    
+    def put(self, request):
+        usuario = get_object_or_404(Usuario, username= self.request.user)
+        if usuario.is_mype:
+            data = JSONParser().parse(request)
+            serializer = MobiliarioPerdidoPutSerializer(data=data)
+            if serializer.is_valid():
+                idMob = serializer.validated_data['id']
+                mobPerdido_data = serializer.validated_data['mobiliarioPerdido']
+                cantidadNueva = mobPerdido_data['cantidad']
+                try:
+                    mobPerdido = get_object_or_404(MobiliarioPerdido, id=idMob)
+                    cantidadActual = mobPerdido.cantidad
+                    mobiliario = Mobiliario.objects.annotate(
+                            total_mantenimiento=Sum('mobiliarioenmantenimiento__cantidad')
+                        ).annotate(
+                            total_perdido=Sum('mobiliarioperdido__cantidad')
+                        ).get(id=mobPerdido.mobiliario.id)
+                    totalMantenimiento = 0
+                    totalPerdido = 0
+                    if mobiliario.total_mantenimiento is not None:
+                        totalMantenimiento = mobiliario.total_mantenimiento
+                    if mobiliario.total_perdido is not None:
+                        totalPerdido = mobiliario.total_perdido
+                    if (mobiliario.total+cantidadActual-totalPerdido-totalMantenimiento-cantidadNueva) < 0:
+                        return Response(self.TOTAL_INSUFICIENTE, status=400)
+                    mobPerdido.cantidad =mobPerdido_data['cantidad']
+                    mobPerdido.pagoRecibido =mobPerdido_data['pagoRecibido']
+                    mobPerdido.totalReposicion =mobPerdido_data['totalReposicion']
+                    mobPerdido.save()
+                    response = {
+                        "Resultado": "Se modificaron los valores correctamente",
+                    }
+                    return Response(response, status=200)
+                except Mobiliario.DoesNotExist:
+                    raise Http404()
+            return JsonResponse(serializer.errors, status=400)
+        return Response(self.NO_MY_PERESPONSE, status=403)
+    
+    def delete(self, request):
+        usuario = get_object_or_404(Usuario, username= self.request.user)
+        if usuario.is_mype:
+            data = JSONParser().parse(request)
+            serializer = MobiliarioPerdidoPutSerializer(data=data, partial=True)
+            if serializer.is_valid():
+                idMob = serializer.validated_data['id']
+                mobPerdido = get_object_or_404(MobiliarioPerdido, id=idMob)
+                mobPerdido.delete()
+                response = {
+                    "resultado": "La operación se realizó exitosamente",
+                }
+                return Response(response, status=200)
+            return JsonResponse(serializer.errors, status=400)
+        return Response(self.NO_MY_PERESPONSE, status=403)
+    
+    def get(self, request):
+        usuario = get_object_or_404(Usuario, username= self.request.user)
+        if usuario.is_mype:
+            mype = usuario.mype
+            qs1 = mype.mobiliario_set.all()
+            qs = MobiliarioPerdido.objects.select_related('mobiliario').all()
+            qr = qs.filter(mobiliario_id__in=qs1).select_related('cliente')
+            serializer = MobiliarioPerdidoGetSerializer(qr, many=True)
+            jsonData = JSONRenderer().render(serializer.data)
+            return Response(jsonData, status=200)
+        return Response(self.NO_MY_PERESPONSE, status=403)

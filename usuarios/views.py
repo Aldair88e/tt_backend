@@ -1,11 +1,10 @@
-from django.shortcuts import render
 from rest_framework import views
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .models import Usuario, Cliente, Direccion, Mype
+from .models import Usuario, Direccion, Mype, Cliente, ClienteWeb
 from django.shortcuts import get_object_or_404
-from .serializers import UsuarioSerializer, RegistroClienteSerializer, DireccionSerializer, UpdateClienteSerializer, RegistroMypeSerializer, ClientePutSerializer, DireccionPutSerializer, MypeSerializer, PutMypeSerializer, getClienteSerializer, getMypeSerializer
+from .serializers import UsuarioSerializer, RegistroClienteSerializer, DireccionSerializer, UpdateClienteSerializer, RegistroMypeSerializer, ClientePutSerializer, DireccionPutSerializer, MypeSerializer, PutMypeSerializer
 from rest_framework.parsers import JSONParser
 from django.http import JsonResponse
 from rest_framework.renderers import JSONRenderer
@@ -29,7 +28,7 @@ class user_haveData(views.APIView):
             }
             return Response(response)
         elif user.have_data and not(user.is_mype):
-            cliente = user.cliente
+            cliente = user.clienteweb.cliente
             # serializerCliente = getClienteSerializer(cliente)
             # print(serializerCliente.data)
             response = {
@@ -50,23 +49,23 @@ class clienteRegistro(views.APIView):
         data = JSONParser().parse(request)
         user = get_object_or_404(Usuario, username=self.request.user)
         serializer = RegistroClienteSerializer(data=data)
-        if serializer.is_valid():
+        if serializer.is_valid(): 
             cliente_data = serializer.validated_data['cliente']
             direccion_data = serializer.validated_data['direccion']
-            cli = Cliente.objects.create(usuario=user, **cliente_data)
+            cli = Cliente.objects.create(**cliente_data)
+            webCli = ClienteWeb.objects.create(cliente=cli, usuario=user)
             direccion = Direccion.objects.create(**direccion_data)
             cli.direcciones.add(direccion)
-            usuario = cli.usuario
-            usuario.have_data = True
-            usuario.save()
-            userSerializer = UsuarioSerializer(usuario)
+            user.have_data = True
+            user.save()
+            userSerializer = UsuarioSerializer(user)
             return JsonResponse(userSerializer.data, status=201)
         print(serializer.errors)
         return JsonResponse(serializer.errors, status=400)
 
     def get(self, request):
         user = get_object_or_404(Usuario, username=self.request.user)
-        cliente = user.cliente
+        cliente = user.clienteweb.cliente
         direcciones = cliente.direcciones.all()
         serializerCliente = ClientePutSerializer(cliente)
         serializerDireccion = DireccionSerializer(direcciones, many=True)
@@ -78,15 +77,13 @@ class clienteRegistro(views.APIView):
     
     def put(self, request):
         user = get_object_or_404(Usuario, username=self.request.user)
-        cliente = user.cliente
+        cliente = user.clienteweb.cliente
         direcciones = cliente.direcciones.all()
         data = JSONParser().parse(request)
         serializer = UpdateClienteSerializer(data=data, partial = True)
         
         if serializer.is_valid():
-            print(serializer.data)
             cliente_data = serializer.validated_data.pop('cliente')
-            print(cliente_data)
             direcciones_data = serializer.validated_data.pop('direcciones')
             print(direcciones_data)
             serializer_cliente = ClientePutSerializer(cliente, cliente_data, partial=True)
@@ -108,6 +105,7 @@ class clienteRegistro(views.APIView):
                 }
                 return Response(response)
             return JsonResponse(serializer_cliente.errors, status=400)
+        return JsonResponse(serializer.errors, status=400)
 
 class MypeRegistro(views.APIView):
     authentication_classes = [TokenAuthentication]

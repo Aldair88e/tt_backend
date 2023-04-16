@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
+import uuid
 # Create your models here.
 
 class Usuario(AbstractUser):
@@ -11,24 +12,26 @@ class Direccion(models.Model):
     codigoPostal = models.CharField(max_length=5)
     numInterior = models.CharField(max_length=15, blank=True)
     numExterior = models.CharField(max_length=15)
-    calle = models.CharField(max_length=40)
-    colonia = models.CharField(max_length=40)
-    ciudad = models.CharField(max_length=50)
-    estado = models.CharField(max_length=30)
+    calle = models.CharField(max_length=60)
+    colonia = models.CharField(max_length=60)
+    ciudad = models.CharField(max_length=60)
+    estado = models.CharField(max_length=60)
     referencia = models.TextField(blank=True)
+
+    def __str__(self):
+        return '%s, %s, %s, %s, %s' % (self.calle, self.numExterior, self.colonia, self.ciudad, self.estado)
 # class Cliente_tiene_Direccion():
 
 class Cliente(models.Model):
-    usuario = models.OneToOneField(
-        Usuario,
-        on_delete=models.CASCADE,
-        primary_key=True,
-    )
     nombre = models.CharField(max_length=50)
     apellido1 = models.CharField(max_length=40)
     apellido2 = models.CharField(max_length=40, blank=True)
     telefono = models.CharField(max_length=10)
+    is_web = models.BooleanField(default=False)
     direcciones = models.ManyToManyField(Direccion, blank=True)
+
+    def __str__(self):
+        return '%d %s %s' % (self.id, self.nombre, self.apellido1)
 
 class Mype(models.Model):
     usuario = models.OneToOneField(
@@ -45,3 +48,16 @@ class Mype(models.Model):
     facebook = models.URLField(blank=True)
     twitter = models.URLField(blank=True)
     instagram = models.URLField(blank=True)
+
+class ClienteWeb(models.Model):
+    cliente = models.OneToOneField(Cliente, on_delete=models.CASCADE)
+    usuario = models.OneToOneField(Usuario, on_delete=models.CASCADE)
+
+class ClientePorTelefono(models.Model):
+    cliente = models.OneToOneField(
+        Cliente,
+        on_delete=models.CASCADE,
+        primary_key=True,
+    )
+    descuento = models.FloatField(default=0)
+    mype = models.ForeignKey(Mype, on_delete=models.CASCADE)

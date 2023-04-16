@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'indexServerApp',
     'usuarios',
     'GestionInventario',
+    'gestionClientes',
     'django_cleanup.apps.CleanupConfig',
 ]
 
@@ -226,4 +227,5 @@ CORS_ALLOW_HEADERS = [
     'user-agent',
     'x-csrftoken',
     'x-requested-with',
+    'cliente-id',
 ]

@@ -21,7 +21,8 @@ from django_postalcodes_mexico import urls as django_postalcodes_mexico_urls
 from django.conf import settings
 from django.conf.urls.static import static
 from indexServerApp import views
-from GestionInventario.views import MobiliarioRegistro, MobiliarioMantenimientoView, MobiliarioShortview
+from GestionInventario.views import MobiliarioRegistro, MobiliarioMantenimientoView, MobiliarioShortview, MobiliarioPerdidoView
+from gestionClientes.views import ClientePorTelefonoView, ListaClientesView, ClientesShortView
 # from GestionInventario import views as InventarioViews
 
 react_routes = getattr(settings, 'REACT_ROUTES', [])
@@ -40,6 +41,10 @@ urlpatterns = [
     path('mobiliario/', MobiliarioRegistro.as_view(), name='mobiliarioRegistro'),
     path('api/mantenimiento/', MobiliarioMantenimientoView.as_view(), name='mantenimiento'),
     path('api/mobiliario/short/', MobiliarioShortview.as_view(), name='mobiliario_short'),
+    path('api/mobiliario/perdido/', MobiliarioPerdidoView.as_view(), name='mobiliario_perdido'),
+    path('api/gestion-clientes/', ClientePorTelefonoView.as_view(), name='gestion_clientes'),
+    path('api/gestion-clientes/lista/', ListaClientesView.as_view(), name='lista_clientes'),
+    path('api/gestion-clientes/clientes-short/', ClientesShortView.as_view(), name='Cliente_short'),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 urlpatterns += static(settings.MEDIA_URL, document_root = settings.MEDIA_ROOT)
