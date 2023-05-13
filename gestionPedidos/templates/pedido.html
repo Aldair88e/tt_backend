@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+<div class="encabezado">
+
+    <h3 class="titulo">Reporte de pedido</h3>
+    <p class="text-center">{{mype.nombreEmpresa}}</p>
+    {% for d in direccionMype %}
+        <p class="text-center">
+            {{d.calle}} #{{d.numExterior}}, {{d.colonia}}, {{d.ciudad}}, {{d.estado}}  
+        </p>
+    {% endfor %}
+    <p class="text-center">Teléfono: {{mype.telefono}}</p>
+</div>
+<div class="info-cliente">
+    <p class="text-left">Pedido a nombre de: {{cliente.nombre}} {{cliente.apellido1}} {{cliente.apellido2}}</p>
+    <p class="text-left">Teléfono: {{cliente.telefono}}</p>
+    {% for d in direccionCli %}
+        <p class="text-left">
+            Entregar en: {{d.calle}} #{{d.numExterior}}, {{d.colonia}}, {{d.ciudad}}, {{d.estado}}  
+        </p>
+    {% endfor %}
+    <p class="text-left">
+        Fecha de entrega:
+        {%language 'es' %} 
+            {{pedido.fechaEntrega}}
+        {%endlanguage%}
+    </p>
+    <p class="text-left">
+        Fecha de recolección: 
+        {%language 'es' %}
+            {{pedido.fechaRecoleccion}}
+        {%endlanguage%}
+    </p>
+</div>
+<table class="tabla">
+    <tr>
+        <th class="celda nombre">Concepto</th>
+        <th class="celda">Cantidad</th>
+        <th class="celda" colspan="2">Precio unitario</th>
+        <th class="celda" colspan="2">Subtotal</th>
+    </tr>
+    {% for m in mobRentado %}
+        <tr>
+            <td class="celda grande">
+                {{m.mobiliario.nombre}}
+            </td>
+            <td class="celda">
+                <div class="derecha">
+                    {{m.cantidad}}
+                </div>
+            </td>
+            <td class="celda celdaLeft">
+                <div class="nombre">
+                    $
+                </div>
+            </td>
+            <td class="celda celdaRigth">
+                <div class="derecha">
+                    {{m.precio}}
+                </div>
+            </td>
+            <td class="celda celdaLeft">
+                <div class="nombre">
+                    $
+                </div>
+            </td>
+            <td class="celda celdaRigth">
+                <div class="derecha">
+                    {{m.subtotal}}
+                </div>
+            </td>
+        </tr>
+    {%endfor%}
+    {% for c in cargosExtra %}
+        <tr>
+            <td class="celda grande">
+                {{c.concepto}}
+            </td>
+            <td class="celda">
+                <div class="derecha">
+                    1
+                </div>
+            </td>
+            <td class="celda celdaLeft">
+                <div class="nombre">
+                    $
+                </div>
+            </td>
+            <td class="celda celdaRigth">
+                <div class="derecha">
+                    {{c.precio}}
+                </div>
+            </td>
+            <td class="celda celdaLeft">
+                <div class="nombre">
+                    $
+                </div>
+            </td>
+            <td class="celda celdaRigth">
+                <div class="derecha">
+                    {{c.precio}}
+                </div>
+            </td>
+        </tr>
+    {%endfor%}
+    <tr>
+        <td class="celda"></td>
+        <td class="celda" colspan="3"><b>Total</b></td>
+        <td class="celda celdaLeft">
+            <div class="nombre">$</div>
+        </td>
+        <td class="celda celdaRigth" >
+            <div class="derecha">{{total}}</div>
+        </td>
+    </tr>
+    <tr>
+        <td class="celda"></td>
+        <td class="celda" colspan="3"><b>Pago recibido</b></td>
+        <td class="celda celdaLeft">
+            <div class="nombre">$</div>
+        </td>
+        <td class="celda celdaRigth" >
+            <div class="derecha">{{pedido.pagoRecibido}}</div>
+        </td>
+    </tr>
+    <tr>
+        <td class="celda"></td>
+        <td class="celda" colspan="3"><b>Adeudo</b></td>
+        <td class="celda celdaLeft">
+            <div class="nombre">$</div>
+        </td>
+        <td class="celda celdaRigth" >
+            <div class="derecha">{{adeudo}}</div>
+        </td>
+    </tr>
+</table>
+<div class="notas">
+    <p>Nota:{{pedido.notas}}</p>
+</div>
+<div class="agradecimiento">
+    <p>¡Gracias por su preferencia!</p>
+</div>
+{% endblock %}

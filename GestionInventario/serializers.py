@@ -1,20 +1,21 @@
 from rest_framework import serializers
-from .models import Mobiliario, MobiliarioEnMantenimiento, MobiliarioPerdido
+from .models import Mobiliario, MobiliarioEnMantenimiento, MobiliarioPerdido, MobiliarioRentado
 
 class MobiliarioSerializer(serializers.ModelSerializer):
     imagen = serializers.ImageField(max_length=None, use_url=True)
     total_mantenimiento = serializers.IntegerField(allow_null=True)
     total_perdido = serializers.IntegerField(allow_null=True)
+    total_rentado = serializers.IntegerField(allow_null=True)
     class Meta:
         model = Mobiliario
-        fields = ['imagen', 'nombre', 'id', 'total', 'precioCompra', 'precioRenta', 'proveedor', 'total_mantenimiento', 'descripcion', 'total_perdido']
+        fields = ['imagen', 'nombre', 'id', 'total', 'precioCompra', 'precioRenta', 'proveedor', 'total_mantenimiento', 'descripcion', 'total_perdido', 'total_rentado']
 
 
 class MobiliarioShortSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField()
     class Meta:
         model = Mobiliario
-        fields = ['id', 'nombre']
+        fields = ['id', 'nombre', 'precioRenta', 'precioCompra']
         
 
 class MobiliarioMantenimientoSerializer(serializers.ModelSerializer):
@@ -83,4 +84,35 @@ class MobiliarioPerdidoPorClienteSerializer(serializers.ModelSerializer):
         model = MobiliarioPerdido
         exclude = ['cliente']
         read_only_fields = ['mobiliario', 'id', 'fecha']
+
+class MobiliarioRentadoSerializer(serializers.ModelSerializer):
+    id = serializers.IntegerField()
+    class Meta:
+        model = MobiliarioRentado
+        fields = ['cantidad', 'precio', 'id']
+        read_only_fields = ['id']
+
+class MobiliarioRentadoPostSerializer(serializers.ModelSerializer):
+    mobiliario = serializers.IntegerField()
+    pedido = serializers.IntegerField()
+    class Meta:
+        model = MobiliarioRentado
+        fields = ['cantidad', 'precio', 'mobiliario', 'pedido']
+
+
+
+class GetMobiliarioRentadoSerializer(serializers.ModelSerializer):
+    mobiliario = serializers.StringRelatedField()
+    class Meta:
+        model = MobiliarioRentado
+        fields = ['cantidad', 'precio', 'id', 'mobiliario']
+        read_only_field = ['mobiliario', 'id']
+
+# class MobiliarioRentadoListaSerializer(serializers.ModelSerializer):
+#     mobiliario = serializers.StringRelatedField()
+#     pedido = PedidoParaMobiliarioSerializer()
+#     class Meta:
+#         model = MobiliarioRentado
+#         fields = ['cantidad', 'mobiliario', 'pedido']
+        
 

@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'usuarios',
     'GestionInventario',
     'gestionClientes',
+    'gestionPedidos',
     'django_cleanup.apps.CleanupConfig',
 ]
 
@@ -228,4 +229,7 @@ CORS_ALLOW_HEADERS = [
     'x-csrftoken',
     'x-requested-with',
     'cliente-id',
+    'pedido-id',
+    'fecha-mobiliario',
+    'pedido-periodo',
 ]

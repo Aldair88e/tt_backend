@@ -1,0 +1,27 @@
+.encabezado{
+    width: 100%;
+    height: fit-content;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.titulo{
+    font-size: 18px;
+    font-weight: bold;
+}
+
+.text-center{
+    margin: 0;
+    font-size: 12px;
+}
+
+.pedido-cliente{
+    width: 100%;
+    height: fit-content;
+    display: flex;
+    flex-direction: column;
+    align-items: start;
+    justify-content: start;
+}

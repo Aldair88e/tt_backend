@@ -4,14 +4,18 @@ from rest_framework import views
 from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from usuarios.models import Usuario, Cliente
-from .models import Mobiliario, MobiliarioEnMantenimiento, MobiliarioPerdido
-from .serializers import MobiliarioSerializer, MobiliarioMantenimientoFullSerializer, MantenimientoOnGetSerializer, MantenimientoDelete, MantenimientoPutSerializer, MobiliarioShortSerializer, MobiliarioPerdidoRegistroSerializer, MobiliarioPerdidoPutSerializer, MobiliarioPerdidoGetSerializer
+from .models import Mobiliario, MobiliarioEnMantenimiento, MobiliarioPerdido, MobiliarioRentado
+from .serializers import MobiliarioSerializer, MobiliarioMantenimientoFullSerializer, MantenimientoOnGetSerializer, MantenimientoDelete, MantenimientoPutSerializer, MobiliarioShortSerializer, MobiliarioPerdidoRegistroSerializer, MobiliarioPerdidoPutSerializer, MobiliarioPerdidoGetSerializer, MobiliarioRentadoSerializer, MobiliarioRentadoPostSerializer
 from django.http import JsonResponse
 from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
-from django.db.models import Sum
+from django.db.models import Sum, OuterRef, Subquery, FloatField, IntegerField, Q
 from django.http import Http404
-
+from .constantes import NO_MYPE_RESPONSE, NO_SE_ENCOTRO, TOTAL_INSUFICIENTE, OPERACION_EXITOSA
+from gestionPedidos.funciones import mobiliarioDisponibleEnPeriodo
+from gestionPedidos.models import Pedido
+from gestionPedidos.serializers import PedidoConMobiliarioRentadoSerializer
+from datetime import date
 
 # Create your views here.
 
@@ -88,27 +92,41 @@ class MobiliarioRegistro(views.APIView):
             mobiliario = Mobiliario.objects.create(mype = mypeObject, imagen = imagen, **datosNuevos)
             serializer = MobiliarioSerializer(mobiliario)
             return JsonResponse(serializer.data, status=201)
-        response = {
-            'usuario' : 'El usuario no es de tipo MYPE',
-        }
-        return  Response(response, status = 400)
+        return  Response(NO_MYPE_RESPONSE, status = 400)
     
     def get(self, request):
         usuario = get_object_or_404(Usuario, username= self.request.user)
-        if usuario.is_mype:
+        if usuario.is_mype: 
+            hoy = date.today()
+            fechaIni = str(hoy) + ' 00:00Z'
+            fechaFin = str(hoy) + ' 23:59Z'
             mypeObject = usuario.mype
-            mobiliario = mypeObject.mobiliario_set.annotate(
+            total_mantenimiento_sum = mypeObject.mobiliario_set.annotate(
                 total_mantenimiento = Sum('mobiliarioenmantenimiento__cantidad')
-                ).annotate(
+            ).filter(pk=OuterRef('pk'))
+            total_perdido_sum = mypeObject.mobiliario_set.annotate(
                 total_perdido = Sum('mobiliarioperdido__cantidad')
-                )
+            ).filter(pk=OuterRef('pk'))
+            pedidosQS1 = mypeObject.pedido_set.filter(fechaEntrega__lte = fechaIni).filter(fechaRecoleccion__gte = fechaFin)
+            pedidosQS2 = mypeObject.pedido_set.filter(fechaEntrega__lte = fechaFin).filter(fechaRecoleccion__gte = fechaFin)
+            pedidosQS3 = mypeObject.pedido_set.filter(fechaEntrega__lte = fechaIni).filter(fechaRecoleccion__gte = fechaIni)
+            pedidosQS4 = mypeObject.pedido_set.filter(fechaEntrega__gt = fechaIni).filter(fechaRecoleccion__lt = fechaFin)
+            pedidosQs = pedidosQS1.union(pedidosQS2, pedidosQS3, pedidosQS4).values_list("id", flat=True).order_by("id")
+            mobRentado = MobiliarioRentado.objects.filter(pedido_id__in = pedidosQs).values_list("id", flat=True).order_by("id")
+            print(mobRentado)
+            total_rentado_sum = mypeObject.mobiliario_set.annotate(
+                total_rentado = Sum('mobiliariorentado__cantidad', filter=Q(mobiliariorentado__id__in=mobRentado))
+            ).filter(pk=OuterRef('pk'))
+            mobiliario = mypeObject.mobiliario_set.annotate(
+                total_mantenimiento = Subquery(total_mantenimiento_sum.values('total_mantenimiento'), output_field=IntegerField()),
+                total_perdido = Subquery(total_perdido_sum.values('total_perdido'), output_field= IntegerField()),
+                total_rentado = Subquery(total_rentado_sum.values('total_rentado'), output_field= IntegerField())
+            )
             serializer = MobiliarioSerializer(mobiliario, many=True)
+            print(serializer.data)
             jsonData = JSONRenderer().render(serializer.data)
             return Response(jsonData, status=200)
-        response = {
-            'usuario' : 'El usuario no es de tipo MYPE',
-        }
-        return Response(response, status=400)
+        return Response(NO_MYPE_RESPONSE, status=400)
 
     def put(self, request):
         user = get_object_or_404(Usuario, username = self.request.user)
@@ -159,10 +177,7 @@ class MobiliarioRegistro(views.APIView):
             mobiliarioObject.save()
             serializer = MobiliarioSerializer(mobiliarioObject)
             return JsonResponse(serializer.data, status=200)
-        response = {
-            'usuario' : 'El usuario no es de tipo MYPE',
-        }
-        return Response(response, status=400)
+        return Response(NO_MYPE_RESPONSE, status=400)
 
     def delete(self, request):
         user = get_object_or_404(Usuario, username = self.request.user)
@@ -176,23 +191,13 @@ class MobiliarioRegistro(views.APIView):
                 mobiliario = mypeObject.mobiliario_set.all()
                 serializer = MobiliarioSerializer(mobiliario, many=True)
                 jsonData = JSONRenderer().render(serializer.data)
-                return Response(jsonData, status=200)
-            response = {
-                'error':'El registro no existe en la base de datos'
-            } 
-            return Response(response, status=400)
-        response = {
-            'usuario':'El usuario no es de tipo MYPE'
-        } 
-        return Response(response, status=400)
+                return Response(jsonData, status=200) 
+            return Response(NO_SE_ENCOTRO, status=400) 
+        return Response(NO_MYPE_RESPONSE, status=400)
                 
 class MobiliarioMantenimientoView(views.APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    NO_MY_PERESPONSE = {
-        'usuario':'El usuario no es de tipo MYPE'
-    }
-
 
     def post(self, request):
         usuario = get_object_or_404(Usuario, username= self.request.user)
@@ -228,7 +233,7 @@ class MobiliarioMantenimientoView(views.APIView):
                 except Mobiliario.DoesNotExist:
                     raise Http404()
             return JsonResponse(serializer.errors, status=400) 
-        return Response(self.NO_MY_PERESPONSE, status=400)
+        return Response(NO_MYPE_RESPONSE, status=400)
 
     def get(self, request):
         usuario = get_object_or_404(Usuario, username= self.request.user)
@@ -240,10 +245,7 @@ class MobiliarioMantenimientoView(views.APIView):
             serializer = MantenimientoOnGetSerializer(qr, many=True)
             jsonData = JSONRenderer().render(serializer.data)
             return Response(jsonData, status=200)
-        response = {
-            'usuario':'El usuario no es de tipo MYPE'
-        } 
-        return Response(response, status=400)
+        return Response(NO_MYPE_RESPONSE, status=400)
     
     def delete(self, request):
         usuario = get_object_or_404(Usuario, username= self.request.user)
@@ -258,11 +260,9 @@ class MobiliarioMantenimientoView(views.APIView):
                     "resultado": "Se eliminó correctamente",
                 }
                 return Response(response, status=200)
-            return JsonResponse(serializer.errors, status=400)
-        response = {
-            'usuario':'El usuario no es de tipo MYPE'
-        } 
-        return Response(response, status=400)
+            return JsonResponse(serializer.errors, status=400) 
+        return Response(NO_MYPE_RESPONSE, status=400)
+    
     def put(self, request):
         usuario = get_object_or_404(Usuario, username= self.request.user)
         if usuario.is_mype:
@@ -286,7 +286,7 @@ class MobiliarioMantenimientoView(views.APIView):
                         totalMantenimiento = mobiliario.total_mantenimiento
                     if mobiliario.total_perdido is not None:
                         totalPerdido = mobiliario.total_perdido
-                    if (mobiliario.total+cantidadActual-cantidad-totalPerdido-totalMantenimiento) < 0:
+                    if (mobiliario.total+ cantidadActual - cantidad - totalPerdido - totalMantenimiento) < 0:
                         response = {
                             "Error": "El total del mobiliario es insuficiente para realizar esta operacion",
                         }
@@ -306,23 +306,14 @@ class MobiliarioMantenimientoView(views.APIView):
                     return Response(response, status=200)
                 except Mobiliario.DoesNotExist:
                     raise Http404()
-            return JsonResponse(serializer.errors, status=400)
-        response = {
-            'usuario':'El usuario no es de tipo MYPE'
-        } 
-        return Response(response, status=400)
+            return JsonResponse(serializer.errors, status=400) 
+        return Response(NO_MYPE_RESPONSE, status=400)
     
 class MobiliarioPerdidoView(views.APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
-    NO_MY_PERESPONSE = {
-        'usuario':'El usuario no es de tipo MYPE'
-    }
     TOTAL_INSUFICIENTE = {
-        "Error": "El total del mobiliario es suficiente para realizar esta operacion",
-    }
-    NO_SE_ENCOTRO = {
-        "Error": "No se encontro el registro indicado",
+        "Error": "El total del mobiliario no es suficiente para realizar esta operación",
     }
 
     def post(self, request):
@@ -333,6 +324,7 @@ class MobiliarioPerdidoView(views.APIView):
             serializer = MobiliarioPerdidoRegistroSerializer(data=data) 
             if serializer.is_valid():
                 mobPerd = serializer.validated_data['mobiliarioPerdido']
+                cantidadNueva = mobPerd['cantidad']
                 mobiliario_id = serializer.validated_data['mobiliario']
                 cliente_id = serializer.validated_data['cliente']
                 mobiliario = mype.mobiliario_set.annotate(
@@ -349,16 +341,16 @@ class MobiliarioPerdidoView(views.APIView):
                             totalPerdido = m.total_perdido
                         if m.total_mantenimiento is not None:
                             totalMantenimiento = m.total_mantenimiento
-                        if (m.total - totalPerdido - totalMantenimiento) < 0:
+                        if (m.total - totalPerdido - totalMantenimiento - cantidadNueva) < 0:
                             return Response(self.TOTAL_INSUFICIENTE, status=400)
                         mobPerdido = MobiliarioPerdido.objects.create(mobiliario=m, cliente = cliente, **mobPerd)  
                         response = {
                             "respuesta":"El mobiliario se registró como perdido",
                         }
                         return Response(response, status=201)
-                return Response(self.NO_SE_ENCOTRO, status=404)
+                return Response(NO_SE_ENCOTRO, status=404)
             return JsonResponse(serializer.errors, status=400)
-        return Response(self.NO_MY_PERESPONSE, status=403)
+        return Response(NO_MYPE_RESPONSE, status=403)
     
     def put(self, request):
         usuario = get_object_or_404(Usuario, username= self.request.user)
@@ -383,7 +375,7 @@ class MobiliarioPerdidoView(views.APIView):
                         totalMantenimiento = mobiliario.total_mantenimiento
                     if mobiliario.total_perdido is not None:
                         totalPerdido = mobiliario.total_perdido
-                    if (mobiliario.total+cantidadActual-totalPerdido-totalMantenimiento-cantidadNueva) < 0:
+                    if (mobiliario.total + cantidadActual - totalPerdido - totalMantenimiento - cantidadNueva) < 0:
                         return Response(self.TOTAL_INSUFICIENTE, status=400)
                     mobPerdido.cantidad =mobPerdido_data['cantidad']
                     mobPerdido.pagoRecibido =mobPerdido_data['pagoRecibido']
@@ -396,7 +388,7 @@ class MobiliarioPerdidoView(views.APIView):
                 except Mobiliario.DoesNotExist:
                     raise Http404()
             return JsonResponse(serializer.errors, status=400)
-        return Response(self.NO_MY_PERESPONSE, status=403)
+        return Response(NO_MYPE_RESPONSE, status=403)
     
     def delete(self, request):
         usuario = get_object_or_404(Usuario, username= self.request.user)
@@ -412,7 +404,7 @@ class MobiliarioPerdidoView(views.APIView):
                 }
                 return Response(response, status=200)
             return JsonResponse(serializer.errors, status=400)
-        return Response(self.NO_MY_PERESPONSE, status=403)
+        return Response(NO_MYPE_RESPONSE, status=403)
     
     def get(self, request):
         usuario = get_object_or_404(Usuario, username= self.request.user)
@@ -424,4 +416,91 @@ class MobiliarioPerdidoView(views.APIView):
             serializer = MobiliarioPerdidoGetSerializer(qr, many=True)
             jsonData = JSONRenderer().render(serializer.data)
             return Response(jsonData, status=200)
+        return Response(NO_MYPE_RESPONSE, status=403)
+    
+class MobiliarioRentadoView(views.APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        usuario = get_object_or_404(Usuario, username= self.request.user)
+        if usuario.is_mype:
+            mype = usuario.mype
+            data = JSONParser().parse(request)
+            serializer = MobiliarioRentadoPostSerializer(data=data)
+            if serializer.is_valid():
+                mobiliario_id = serializer.validated_data['mobiliario']
+                pedido_id = serializer.validated_data['pedido']
+                mobiliario = get_object_or_404(Mobiliario, id=mobiliario_id)
+                pedido = get_object_or_404(Pedido, id=pedido_id)
+                mobDisponible = mobiliarioDisponibleEnPeriodo(mobiliario_id, pedido.fechaEntrega, pedido.fechaRecoleccion)
+                cantidad = serializer.validated_data['cantidad']
+                if(mobDisponible - cantidad) < 0:
+                    return Response(TOTAL_INSUFICIENTE, status=400)
+                nuevoMob = MobiliarioRentado.objects.create(mobiliario=mobiliario, pedido=pedido, cantidad=cantidad, precio = serializer.validated_data['precio'])
+                return Response(OPERACION_EXITOSA, status=201)
+            return JsonResponse(serializer.errors, status=400)   
+        return Response(NO_MYPE_RESPONSE, status=403)
+    def put(self, request):
+        usuario = get_object_or_404(Usuario, username= self.request.user)
+        if usuario.is_mype:
+            mype = usuario.mype
+            data = JSONParser().parse(request)
+            serializer = MobiliarioRentadoSerializer(data=data)
+            if serializer.is_valid():
+                id_mobRentado = serializer.validated_data['id']
+                mobRentado = get_object_or_404(MobiliarioRentado, id = id_mobRentado)
+                pedido = mobRentado.pedido
+                mobDisponible = mobiliarioDisponibleEnPeriodo(mobRentado.mobiliario.id,pedido.fechaEntrega, pedido.fechaRecoleccion)
+                cantidadActual = mobRentado.cantidad
+                cantidadNueva = serializer.validated_data['cantidad']
+                if(mobDisponible + cantidadActual - cantidadNueva) < 0:
+                    return Response(TOTAL_INSUFICIENTE, status=400)
+                mobRentado.cantidad = cantidadNueva
+                mobRentado.precio = serializer.validated_data['precio']
+                mobRentado.save()  
+                response = {
+                    "respuesta":"El mobiliario rentado se modificó correctamente",
+                }
+                return Response(response, status=200)
+            return JsonResponse(serializer.errors, status=400)
+        return Response(NO_MYPE_RESPONSE, status=403)
+    
+    def delete(self, request):
+        usuario = get_object_or_404(Usuario, username= self.request.user)
+        if usuario.is_mype:
+            data = JSONParser().parse(request)
+            serializer = MobiliarioRentadoSerializer(data=data, partial=True)
+            if serializer.is_valid():
+                id_mobRentado = serializer.validated_data['id']
+                mobRentado = get_object_or_404(MobiliarioRentado, id=id_mobRentado)
+                mobRentado.delete()
+                response = {
+                    "resultado": "La operación se realizó exitosamente",
+                }
+                return Response(response, status=200)
+            return JsonResponse(serializer.errors, status=400)
+        return Response(NO_MYPE_RESPONSE, status=403)
+    
+    def get(self, request):
+        usuario = get_object_or_404(Usuario, username= self.request.user)
+        if usuario.is_mype:
+            mype = usuario.mype
+            if 'Fecha-Mobiliario' in request.headers:
+                fecha = request.headers['Fecha-Mobiliario']
+                fechaIni = fecha + ' 00:00Z'
+                fechaFin = fecha + ' 23:59Z'
+                pedidosQS1 = mype.pedido_set.prefetch_related('mobiliariorentado_set').filter(fechaEntrega__lte = fechaIni).filter(fechaRecoleccion__gte = fechaFin)
+                pedidosQS2 = mype.pedido_set.prefetch_related('mobiliariorentado_set').filter(fechaEntrega__lte = fechaFin).filter(fechaRecoleccion__gte = fechaFin)
+                pedidosQS3 = mype.pedido_set.prefetch_related('mobiliariorentado_set').filter(fechaEntrega__lte = fechaIni).filter(fechaRecoleccion__gte = fechaIni)
+                pedidosQS4 = mype.pedido_set.prefetch_related('mobiliariorentado_set').filter(fechaEntrega__gt = fechaIni).filter(fechaRecoleccion__lt = fechaFin)
+                pedidosQs = pedidosQS1.union(pedidosQS2, pedidosQS3, pedidosQS4)
+                # mobiliarioQS = MobiliarioRentado.objects.select_related('cliente').select_related('pedido').filter(id__in = pedidosQs)
+                serializer = PedidoConMobiliarioRentadoSerializer(pedidosQs, many=True)
+                jsonData = JSONRenderer().render(serializer.data)
+                return Response(jsonData, status=200)
+            response = {
+                "error": "No se recibió el header esperado Fecha-Mobiliario",
+            }
+            return Response(response, status = 400)
         return Response(self.NO_MY_PERESPONSE, status=403)

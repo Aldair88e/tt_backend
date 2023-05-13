@@ -9,8 +9,9 @@ from .serializers import CrearClienteSerializer, ModificarClienteSerializer, Put
 from usuarios.serializers import DireccionPutSerializer
 from django.http import JsonResponse, Http404
 from rest_framework.renderers import JSONRenderer
-from django.db.models import Sum
+from django.db.models import Sum, Count, FloatField, Subquery, OuterRef, IntegerField, F
 from GestionInventario.serializers import MobiliarioPerdidoPorClienteSerializer
+from gestionPedidos.serializers import PedidoParaHistorialClienteSerializer
 # from usuarios.serializers import RegistroClienteSerializer
 # Create your views here.
 
@@ -133,9 +134,6 @@ class ClientePorTelefonoView(views.APIView):
         user = get_object_or_404(Usuario, username=self.request.user)
         if user.is_mype:
             mype = user.mype
-            # data = JSONParser().parse(request)
-            # serializer = PutClienteporTelSerializer(data=data, partial = True)
-            # if serializer.is_valid():
             cliente_id = request.headers['Cliente-Id']
             cliente = get_object_or_404(Cliente, id=cliente_id)
             if cliente.is_web:
@@ -148,11 +146,19 @@ class ClientePorTelefonoView(views.APIView):
                 for cpt in clientePorTel:
                     clienteInst = cpt.cliente
                     mobiliarioPerdido = clienteInst.mobiliarioperdido_set.all()
+                    precio_mobiliario_sum =clienteInst.pedido_set.annotate(total_mobiliario = Sum(F('mobiliariorentado__precio')*F('mobiliariorentado__cantidad'))).filter(pk=OuterRef('pk'))
+                    cargos_sum = clienteInst.pedido_set.annotate(total_cargos = Sum('cargoextra__precio')).filter(pk=OuterRef('pk'))
+                    pedidos = clienteInst.pedido_set.annotate(
+                        total_mobiliario = Subquery(precio_mobiliario_sum.values('total_mobiliario'), output_field=FloatField()),
+                        total_cargos = Subquery(cargos_sum.values('total_cargos'), output_field=FloatField())
+                    )
                     serializerCliente = GetClienteSerializer(clienteInst)
                     serializerMobPerdido = MobiliarioPerdidoPorClienteSerializer(mobiliarioPerdido, many=True)
+                    serializerPedido = PedidoParaHistorialClienteSerializer(pedidos, many=True)
                     response = {
                         "cliente" : JSONRenderer().render(serializerCliente.data),
-                        "mobPerdido" : JSONRenderer().render(serializerMobPerdido.data)
+                        "mobPerdido" : JSONRenderer().render(serializerMobPerdido.data),
+                        "pedidos" : JSONRenderer().render(serializerPedido.data),
                     }
                     return Response(response, status=200)
             return Response(self.NOT_FOUND, status=404)
@@ -174,14 +180,28 @@ class ListaClientesView(views.APIView):
         if user.is_mype:
             mype = user.mype
             clientesPorTel = mype.clienteportelefono_set.all()
-            clientesQS = Cliente.objects.annotate(
-                mobiliario_perdido=Sum('mobiliarioperdido__cantidad')
-                ).annotate(
-                mobPerdido_adeudo = Sum('mobiliarioperdido__totalReposicion')
-                ).annotate(
+            mobiliarioPerdidoInfo = Cliente.objects.annotate(
+                mobiliario_perdido = Sum('mobiliarioperdido__cantidad'),
+                mobPerdido_adeudo = Sum('mobiliarioperdido__totalReposicion'),
                 mobPerdido_pagado = Sum('mobiliarioperdido__pagoRecibido')
-                ).annotate(
-                descuento = Sum('clienteportelefono__descuento')
+            ).filter(pk=OuterRef('pk'))
+            pedidoInfo = Cliente.objects.annotate(
+                total_pedidos = Count('pedido')
+            ).filter(pk=OuterRef('pk'))
+            # clientesQS = Cliente.objects.annotate(
+            #     mobiliario_perdido=Sum('mobiliarioperdido__cantidad')
+            #     ).annotate(
+            #     mobPerdido_adeudo = Sum('mobiliarioperdido__totalReposicion')
+            #     ).annotate(
+            #     mobPerdido_pagado = Sum('mobiliarioperdido__pagoRecibido')
+            #     ).annotate(
+            #     descuento = Sum('clienteportelefono__descuento')
+            #     )
+            clientesQS = Cliente.objects.annotate(
+                mobiliario_perdido=Subquery(mobiliarioPerdidoInfo.values('mobiliario_perdido'), output_field = IntegerField()),
+                mobPerdido_adeudo = Subquery(mobiliarioPerdidoInfo.values('mobPerdido_adeudo'), output_field = FloatField()),
+                mobPerdido_pagado = Subquery(mobiliarioPerdidoInfo.values('mobPerdido_pagado'), output_field = FloatField()),
+                total_pedidos = Subquery(pedidoInfo.values('total_pedidos'), output_field = IntegerField()),
                 )
             clientesMype = clientesQS.filter(id__in=clientesPorTel).prefetch_related('direcciones')
             serializer = ClienteParaListaSerializer(clientesMype, many=True)

@@ -1,5 +1,6 @@
 from django.db import models
 from usuarios.models import Mype, Cliente
+from gestionPedidos.models import Pedido
 
 # Create your models here.
 class Mobiliario(models.Model):
@@ -29,3 +30,11 @@ class MobiliarioPerdido(models.Model):
     totalReposicion = models.FloatField(blank=True, null=True)
     pagoRecibido = models.FloatField(blank=True, null=True)
     fecha = models.DateField(auto_now_add=True)
+
+
+##Agregado en el incremento 4 para el modulo de gestion de pedidos
+class MobiliarioRentado(models.Model):
+    cantidad = models.PositiveIntegerField()
+    precio = models.FloatField()
+    mobiliario = models.ForeignKey(Mobiliario, on_delete=models.CASCADE)
+    pedido = models.ForeignKey(Pedido, on_delete=models.CASCADE)
