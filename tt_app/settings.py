@@ -12,21 +12,26 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 
 from pathlib import Path
 import os
+# import environ
+
+
+
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
+# env = environ.Env()
+# environ.Env.read_env()
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-sru4s+w64n9=59z_pmux=2^w^j61o71)l-a(=(y*#*rokq7n6='
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 REACT_ROUTES = [
     r'^reestablecer/*/*/',
@@ -101,15 +106,22 @@ WSGI_APPLICATION = 'tt_app.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
+# DATABASES = {
+#     'default': {
+#         'ENGINE': 'django.db.backends.postgresql_psycopg2',
+#         'NAME' : 'proyecto_tt',
+#         'USER' : 'remote',
+#         'PASSWORD' : 'ps',
+#         'HOST' : 'localhost',
+#         'PORT' : '5433',
+#     }
+# }
+
+import dj_database_url
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME' : 'proyecto_tt',
-        'USER' : 'remote',
-        'PASSWORD' : 'ps',
-        'HOST' : 'localhost',
-        'PORT' : '5433',
-    }
+
+    'default' : dj_database_url.parse(os.getenv('DATABASE_URL'))
+
 }
 
 
