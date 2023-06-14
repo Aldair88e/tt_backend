@@ -62,6 +62,7 @@ class UpdateClienteSerializer(serializers.Serializer):
     direcciones = DireccionPutSerializer(many=True)
     
 class MypeSerializer(serializers.ModelSerializer):
+    imagen = serializers.ImageField(max_length=None, use_url=True)
     class Meta:
         model = Mype
         exclude = ['direcciones', 'usuario']

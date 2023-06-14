@@ -8,6 +8,8 @@ from .serializers import UsuarioSerializer, RegistroClienteSerializer, Direccion
 from rest_framework.parsers import JSONParser
 from django.http import JsonResponse
 from rest_framework.renderers import JSONRenderer
+from rest_framework.decorators import api_view, renderer_classes, authentication_classes, permission_classes, parser_classes
+from GestionInventario.constantes import OPERACION_EXITOSA, NO_MYPE_RESPONSE
 # Create your views here.
 class user_haveData(views.APIView):
     authentication_classes = [TokenAuthentication]
@@ -122,8 +124,6 @@ class MypeRegistro(views.APIView):
                 mype = Mype.objects.create(usuario=user, **mype_data)
                 direccion = Direccion.objects.create(**direccion_data)
                 mype.direcciones.add(direccion)
-                print(mype)
-                print(direccion)
                 user.have_data = True
                 user.save()
                 userSerializer = UsuarioSerializer(user)
@@ -187,3 +187,25 @@ class MypeRegistro(views.APIView):
             "Error": "El usuario no es de tipo MYPE",
         }
         return Response(response, status=400)
+    
+
+
+class ImagenView(views.APIView):
+    authentication_classes = [TokenAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        user = get_object_or_404(Usuario, username = request.user)
+        if user.is_mype:
+            mypeObject = user.mype
+            imagen = request.FILES.get('imagen')
+            if imagen is not None:
+                mypeObject.imagen = imagen
+            else:
+                response = {
+                    "imagen": "No se recibió la imagen"
+                }
+                return Response(response, status= 400)
+            mypeObject.save()
+            return Response(OPERACION_EXITOSA, status= 200)
+        return Response(NO_MYPE_RESPONSE, status=400)

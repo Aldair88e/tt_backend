@@ -9,7 +9,7 @@ class Mobiliario(models.Model):
     descripcion = models.TextField(blank=True, null=True)
     precioCompra = models.FloatField(blank=True, null=True)
     precioRenta = models.FloatField(blank=True, null=True)
-    proveedor = models.CharField(max_length=50, blank=True, null=True)
+    proveedor = models.CharField(max_length=50, blank=True, default='Varios proveedores')
     imagen = models.ImageField(blank=True, null=True, upload_to= 'img/')
     mype = models.ForeignKey(Mype, on_delete=models.CASCADE)
 
@@ -21,7 +21,9 @@ class MobiliarioEnMantenimiento(models.Model):
     mobiliario = models.ForeignKey(Mobiliario, on_delete=models.CASCADE)
     cantidad = models.IntegerField()
     fechaInicio = models.DateField(auto_now_add=True)
-    fechaFin = models.DateField(null=True, blank=True)
+    fechaFin = models.DateField(blank=True, null=True)
+    proveedor = models.CharField(blank=True, max_length=50, default='Varios proveedores')
+    cobro = models.FloatField(blank=True, default=0)
 
 class MobiliarioPerdido(models.Model):
     mobiliario = models.ForeignKey(Mobiliario, on_delete=models.CASCADE)

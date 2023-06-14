@@ -2,6 +2,8 @@ from rest_framework import serializers
 from .models import CargoExtra, Pedido
 from GestionInventario.serializers import MobiliarioRentadoSerializer, GetMobiliarioRentadoSerializer
 from gestionClientes.serializers import GetClienteSerializer, ClienteEnPedidoSerializer
+from usuarios.models import Mype
+from usuarios.serializers import DireccionSerializer
 
 class CargoExtraSerializer(serializers.ModelSerializer):
     id = serializers.IntegerField()
@@ -69,8 +71,16 @@ class PedidoParaHistorialClienteSerializer(serializers.ModelSerializer):
         fields = ['id', 'fechaEntrega', 'fechaRecoleccion', 'total_mobiliario', 'total_cargos', 'pagoRecibido','estado']
         read_only_fields = ['id', 'total_mobiliario', 'total_cargos']
 
-# class PedidoParaMobiliarioSerializer(serializers.ModelSerializer):
-#     cliente = serializers.StringRelatedField()
-#     class Meta:
-#         model = Pedido
-#         fields = ['id', 'cliente', 'fechaEntrega', 'fechaRecoleccion']
+
+
+class MypeParaPedidoSerializer(serializers.ModelSerializer):
+    direcciones = DireccionSerializer(many=True)
+    class Meta:
+        model = Mype
+        fields = ['nombreEmpresa', 'telefono', 'direcciones', 'usuario_id']
+
+class PedidoParaClienteSerializer(serializers.ModelSerializer):
+    mype = MypeParaPedidoSerializer()
+    class Meta:
+        model = Pedido
+        fields = ['fechaEntrega', 'fechaRecoleccion', 'estado', 'id', 'mype']

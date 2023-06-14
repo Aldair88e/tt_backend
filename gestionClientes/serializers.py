@@ -25,13 +25,12 @@ class GetClienteSerializer(serializers.ModelSerializer):
 
 class ClienteParaListaSerializer(serializers.ModelSerializer):
     mobiliario_perdido = serializers.IntegerField(allow_null=True)
-    mobPerdido_adeudo = serializers.FloatField(allow_null=True)
-    mobPerdido_pagado = serializers.FloatField(allow_null=True)
+    adeudo = serializers.FloatField(allow_null=True)
     total_pedidos = serializers.IntegerField(allow_null=True)
     direcciones = DireccionPutSerializer(many=True)
     class Meta:
         model = Cliente
-        fields = ['id', 'nombre', 'apellido1', 'telefono', 'is_web', 'mobiliario_perdido', 'mobPerdido_adeudo','mobPerdido_pagado', 'direcciones', 'total_pedidos']
+        fields = ['id', 'nombre', 'apellido1', 'telefono', 'is_web', 'mobiliario_perdido', 'adeudo', 'direcciones', 'total_pedidos']
 
 class ClienteShortSerializer(serializers.ModelSerializer):
     class Meta:

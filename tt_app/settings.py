@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'GestionInventario',
     'gestionClientes',
     'gestionPedidos',
+    'busquedaCotizacion',
     'django_cleanup.apps.CleanupConfig',
 ]
 
@@ -134,7 +135,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/4.1/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es'
 
 TIME_ZONE = 'UTC'
 
@@ -164,11 +165,11 @@ REST_FRAMEWORK ={
     ],
 
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.TokenAuthentication',
     ],
 }
-
+# Removida de DEFAULT_AUTHENTICATION_CLASSES
+# 'rest_framework.authentication.SessionAuthentication',
 AUTHENTICATION_BACKENDS = [
     # allauth specific authentication methods, such as login by e-mail
     'allauth.account.auth_backends.AuthenticationBackend',
@@ -205,9 +206,7 @@ OLD_PASSWORD_FIELD_ENABLED = True
 
 
 #Configuraciones CORS
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",
-]
+CORS_ALLOW_ALL_ORIGINS = True
 
 CORS_ALLOW_METHODS = [
     'DELETE',

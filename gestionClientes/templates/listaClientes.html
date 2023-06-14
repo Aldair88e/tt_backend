@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+<div class="encabezado">
+
+    <h3 class="titulo">Reporte de clientes</h3>
+    <p class="text-center">{{empresa.nombreEmpresa}}</p>
+    {% for d in direccionMype %}
+        <p class="text-center">
+            {{d.calle}} #{{d.numExterior}}, {{d.colonia}}, {{d.ciudad}}, {{d.estado}}  
+        </p>
+    {% endfor %}
+    <p class="text-center">Teléfono: {{empresa.telefono}}</p>
+</div>
+<div class="info-cliente">
+    <p class="text-left">
+        Lista de clientes hasta el dia: 
+        {%language 'es' %}
+            {{fecha}}
+        {%endlanguage%}
+    </p>
+</div>
+<table class="tabla">
+    <tr>
+        <th class="celda nombre">Nombre</th>
+        <th class="celda">Teléfono</th>
+        <th class="celda nombre">Dirección</th>
+        <th class="celda">Total de pedidos</th>
+        <th class="celda">Artículos que perdío</th>
+        <th class="celda" colspan="2">Adeudo</th>
+    </tr>
+    {% for c in clientes %}
+        <tr>
+            <td class="celda">
+                {{c.nombre}} {{c.apellido1}} {{c.apellido2|default_if_none:''}}
+            </td>
+            <td class="celda center">
+                {{c.telefono}}
+            </td>
+            <td class="celda">
+                {% for d in c.direcciones.all %}
+                    <div>
+                        {{d.calle}} #{{d.numExterior}}, {{d.colonia}}, {{d.ciudad}}, {{d.estado}}  
+                    </div>
+                {% endfor %}
+            </td>
+            <td class="celda center">
+                {{c.total_pedidos|default_if_none:'0'}}
+            </td>
+            <td class="celda center">
+                {{c.mobiliario_perdido|default_if_none:'0'}}                
+            </td>
+            <td class="celda celdaLeft">
+                <div class="nombre">
+                    $
+                </div>
+            </td>
+            <td class="celda celdaRigth">
+                <div class="derecha">
+                    {{c.adeudo|default_if_none:'0'}}
+                </div>
+            </td>
+        </tr>
+    {%endfor%}
+  
+</table>
+
+{% endblock %}

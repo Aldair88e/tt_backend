@@ -1,0 +1,122 @@
+{% load i18n %}
+<!doctype html>
+<html lang="es">
+    <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>Reporte PDF</title>
+    
+    <style>
+        @page {
+            size: landscape;
+            page-orientation: "rotate-left";
+            margin: 1.0cm 1.5cm 3.5cm 1.5cm;
+        }
+        body {
+            width: 100% !important;
+            height: 100%;
+            background: #fff;
+            color: black;
+            font-size: 100%;
+            font-family: 'Roboto', sans-serif;
+            line-height: 1.65;
+            -webkit-font-smoothing: antialiased;
+            -webkit-text-size-adjust: none; 
+        }
+        .encabezado{
+            width: 100%;
+            height: fit-content;
+            margin-bottom: 22px;
+        }
+
+        .titulo{
+            font-size: 18px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .text-center{
+            margin: 0;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .info-cliente{
+            width: 100%;
+            height: fit-content;
+            margin-bottom: 20px;
+        }
+
+        .text-left{
+            margin: 0;
+            text-align: left;
+            font-size: 14px;
+        }
+
+        .tabla{
+            width: 98%;
+            height: fit-content;
+            font-size: 14px;
+            border: 1px solid black;
+            border-collapse: collapse;
+            margin-bottom: 22px;
+        }
+
+        .celda{
+            border: 1px solid black;
+            border-collapse: collapse;
+            padding: 10px;
+        }
+
+        .celdaLeft{
+            border-right: none;
+        }
+
+        .celdaRigth{
+            border-left: none;
+        }
+
+        .nombre{
+            text-align:left;
+        }
+
+        .derecha{
+            text-align: right;
+        }
+        .grande{
+            width: 100%;
+        }
+        .notas{
+            width: 100%;
+            height: fit-content;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        .agradecimiento{
+            width: 100%;
+            height: fit-content;
+            font-size: 16px;
+            text-align: center;
+            margin-top: 30px;
+        }
+        .center{
+            text-align: center;
+        }
+        .noDobleFila{
+            white-space: nowrap;
+        }
+        .margenSup{
+            width: 100%;
+            height: 50px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+<main class="container">
+    {% block content %}
+    {% endblock %}
+</main>
+</body>
+</html>

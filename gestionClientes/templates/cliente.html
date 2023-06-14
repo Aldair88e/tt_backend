@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+<div class="encabezado">
+
+    <h3 class="titulo">Reporte de cliente</h3>
+    <p class="text-center">{{empresa.nombreEmpresa}}</p>
+    {% for d in direccionMype %}
+        <p class="text-center">
+            {{d.calle}} #{{d.numExterior}}, {{d.colonia}}, {{d.ciudad}}, {{d.estado}}  
+        </p>
+    {% endfor %}
+    <p class="text-center">Teléfono: {{empresa.telefono}}</p>
+</div>
+<div class="info-cliente">
+    <p class="text-left">Nombre del cliente: {{cliente.nombre}} {{cliente.apellido1}} {{cliente.apellido2|default_if_none:''}}</p>
+    <p class="text-left">Teléfono: {{cliente.telefono}}</p>
+    {% for d in cliente.direcciones.all %}
+        <p class="text-left">
+            Dirección: {{d.calle}} #{{d.numExterior}}, {{d.colonia}}, {{d.ciudad}}, {{d.estado}}  
+        </p>
+    {% endfor %}
+    <p class="text-left">
+</div>
+{%if mobiliarioPerdido %}
+    
+    <table class="tabla">
+        <caption class="margenSup">Artículos perdidos por el cliente</caption>
+        <tr>
+            <th class="celda nombre">Artículo perdido</th>
+            <th class="celda">Cantidad</th>
+            <th class="celda" colspan="2">Cobro por perdida</th>
+            <th class="celda" colspan="2">Pago recibido</th>
+            <th class="celda" colspan="2">Adeudo</th>
+            <th class="celda">Fecha</th>
+        </tr>
+        {% for m in mobiliarioPerdido %}
+            <tr>
+                <td class="celda">
+                    {{m.mobiliario.nombre}}
+                </td>
+                <td class="celda center">
+                    {{m.cantidad}}
+                </td>
+                <td class="celda celdaLeft">
+                    <div class="nombre">
+                        $
+                    </div>
+                </td>
+                <td class="celda celdaRigth">
+                    <div class="derecha">
+                        {{m.totalReposicion|default_if_none:'0'}}
+                    </div>
+                </td>
+                <td class="celda celdaLeft">
+                    <div class="nombre">
+                        $
+                    </div>
+                </td>
+                <td class="celda celdaRigth">
+                    <div class="derecha">
+                        {{m.pagoRecibido|default_if_none:'0'}}
+                    </div>
+                </td>
+                <td class="celda celdaLeft">
+                    <div class="nombre">
+                        $
+                    </div>
+                </td>
+                <td class="celda celdaRigth">
+                    <div class="derecha">
+                        {{m.adeudo|default_if_none:'0'}}
+                    </div>
+                </td>
+                <td class="celda center">
+                    {{m.fecha}}
+                </td>
+            </tr>
+        {%endfor%}
+    
+    </table>
+{% else %}
+    <p>Este cliente no tiene artículos perdidos registrados</p>
+{% endif %}
+<br/>
+<br/>
+{% if pedidos %}    
+        <table class="tabla margenSup">
+            <caption>Historial de pedidos</caption>
+            <tr>
+                <th class="celda nombre">Fecha de entrega</th>
+                <th class="celda">Fecha de recolección</th>
+                <th class="celda" colspan="2">Total</th>
+                <th class="celda" colspan="2">Pago recibido</th>
+                <th class="celda" colspan="2">Adeudo</th>
+                <th class="celda">Estado del pedido</th>
+            </tr>
+            {% for p in pedidos %}
+                <tr>
+                    <td class="celda">
+                        {%language 'es' %} 
+                            {{p.fechaEntrega}}
+                        {%endlanguage%}
+                    </td>
+                    <td class="celda center">
+                        {%language 'es' %} 
+                            {{p.fechaRecoleccion}}
+                        {%endlanguage%}
+                    </td>
+                    <td class="celda celdaLeft">
+                        <div class="nombre">
+                            $
+                        </div>
+                    </td>
+                    <td class="celda celdaRigth">
+                        <div class="derecha">
+                            {{p.total|default_if_none:'0'}}
+                        </div>
+                    </td>
+                    <td class="celda celdaLeft">
+                        <div class="nombre">
+                            $
+                        </div>
+                    </td>
+                    <td class="celda celdaRigth">
+                        <div class="derecha">
+                            {{p.pagoRecibido|default_if_none:'0'}}
+                        </div>
+                    </td>
+                    <td class="celda celdaLeft">
+                        <div class="nombre">
+                            $
+                        </div>
+                    </td>
+                    <td class="celda celdaRigth">
+                        <div class="derecha">
+                            {{p.adeudo|default_if_none:'0'}}
+                        </div>
+                    </td>
+                    <td class="celda center">
+                        {{p.estado}}
+                    </td>
+                </tr>
+            {%endfor%}
+        </table>
+{% else %}
+<p>Este cliente no tiene pedidos registrados</p>
+{% endif %}
+{% endblock %}

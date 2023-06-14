@@ -5,17 +5,24 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from usuarios.models import Usuario, Cliente
 from .models import Mobiliario, MobiliarioEnMantenimiento, MobiliarioPerdido, MobiliarioRentado
-from .serializers import MobiliarioSerializer, MobiliarioMantenimientoFullSerializer, MantenimientoOnGetSerializer, MantenimientoDelete, MantenimientoPutSerializer, MobiliarioShortSerializer, MobiliarioPerdidoRegistroSerializer, MobiliarioPerdidoPutSerializer, MobiliarioPerdidoGetSerializer, MobiliarioRentadoSerializer, MobiliarioRentadoPostSerializer
+from .serializers import MobiliarioSerializer, MobiliarioMantenimientoFullSerializer, MantenimientoOnGetSerializer, MantenimientoDelete, MantenimientoPutSerializer, MobiliarioShortSerializer, MobiliarioPerdidoRegistroSerializer, MobiliarioPerdidoPutSerializer, MobiliarioPerdidoGetSerializer, MobiliarioRentadoSerializer, MobiliarioRentadoPostSerializer, MobiliarioMantenimientoNuevoSerializer, MobiliarioMantenimientoOnPostSerializer
 from django.http import JsonResponse
 from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
-from django.db.models import Sum, OuterRef, Subquery, FloatField, IntegerField, Q
-from django.http import Http404
+from django.db.models import Sum, OuterRef, Subquery, FloatField, IntegerField, Q, F
+from django.db.models.functions import Coalesce
+from django.http import Http404, HttpResponse
 from .constantes import NO_MYPE_RESPONSE, NO_SE_ENCOTRO, TOTAL_INSUFICIENTE, OPERACION_EXITOSA
 from gestionPedidos.funciones import mobiliarioDisponibleEnPeriodo
 from gestionPedidos.models import Pedido
 from gestionPedidos.serializers import PedidoConMobiliarioRentadoSerializer
 from datetime import date
+from headless_pdfkit import generate_pdf
+from rest_framework.decorators import api_view, renderer_classes, authentication_classes, permission_classes
+from busquedaCotizacion.forms import IdMypeForm
+from django.template.loader import render_to_string
+from datetime import datetime
+import pytz
 
 # Create your views here.
 
@@ -96,10 +103,14 @@ class MobiliarioRegistro(views.APIView):
     
     def get(self, request):
         usuario = get_object_or_404(Usuario, username= self.request.user)
-        if usuario.is_mype: 
-            hoy = date.today()
+        if usuario.is_mype:
+            Tz = pytz.timezone("America/Mexico_City")
+            hoy = datetime.now(Tz).date()
             fechaIni = str(hoy) + ' 00:00Z'
-            fechaFin = str(hoy) + ' 23:59Z'
+            fechaFin = str(hoy) + ' 23:59Z' 
+            # hoy = date.today()
+            # fechaIni = str(hoy) + ' 00:00Z'
+            # fechaFin = str(hoy) + ' 23:59Z'
             mypeObject = usuario.mype
             total_mantenimiento_sum = mypeObject.mobiliario_set.annotate(
                 total_mantenimiento = Sum('mobiliarioenmantenimiento__cantidad')
@@ -107,13 +118,17 @@ class MobiliarioRegistro(views.APIView):
             total_perdido_sum = mypeObject.mobiliario_set.annotate(
                 total_perdido = Sum('mobiliarioperdido__cantidad')
             ).filter(pk=OuterRef('pk'))
-            pedidosQS1 = mypeObject.pedido_set.filter(fechaEntrega__lte = fechaIni).filter(fechaRecoleccion__gte = fechaFin)
-            pedidosQS2 = mypeObject.pedido_set.filter(fechaEntrega__lte = fechaFin).filter(fechaRecoleccion__gte = fechaFin)
-            pedidosQS3 = mypeObject.pedido_set.filter(fechaEntrega__lte = fechaIni).filter(fechaRecoleccion__gte = fechaIni)
-            pedidosQS4 = mypeObject.pedido_set.filter(fechaEntrega__gt = fechaIni).filter(fechaRecoleccion__lt = fechaFin)
-            pedidosQs = pedidosQS1.union(pedidosQS2, pedidosQS3, pedidosQS4).values_list("id", flat=True).order_by("id")
+            # pedidosQS1 = mypeObject.pedido_set.filter(fechaEntrega__lte = fechaIni).filter(fechaRecoleccion__gte = fechaFin)
+            # pedidosQS2 = mypeObject.pedido_set.filter(fechaEntrega__lte = fechaFin).filter(fechaRecoleccion__gte = fechaFin)
+            # pedidosQS3 = mypeObject.pedido_set.filter(fechaEntrega__lte = fechaIni).filter(fechaRecoleccion__gte = fechaIni)
+            # pedidosQS4 = mypeObject.pedido_set.filter(fechaEntrega__gt = fechaIni).filter(fechaRecoleccion__lt = fechaFin)
+            # pedidosQs = pedidosQS1.union(pedidosQS2, pedidosQS3, pedidosQS4).values_list("id", flat=True).order_by("id")
+            pedidosQs = mypeObject.pedido_set.filter(
+                Q(fechaEntrega__lte = fechaIni, fechaRecoleccion__gte = fechaIni) |
+                Q(fechaEntrega__lte =fechaFin, fechaRecoleccion__gte = fechaFin) |
+                Q(fechaEntrega__gte = fechaIni, fechaRecoleccion__lte = fechaFin)
+            ).values_list("id", flat=True).order_by("id")
             mobRentado = MobiliarioRentado.objects.filter(pedido_id__in = pedidosQs).values_list("id", flat=True).order_by("id")
-            print(mobRentado)
             total_rentado_sum = mypeObject.mobiliario_set.annotate(
                 total_rentado = Sum('mobiliariorentado__cantidad', filter=Q(mobiliariorentado__id__in=mobRentado))
             ).filter(pk=OuterRef('pk'))
@@ -123,7 +138,6 @@ class MobiliarioRegistro(views.APIView):
                 total_rentado = Subquery(total_rentado_sum.values('total_rentado'), output_field= IntegerField())
             )
             serializer = MobiliarioSerializer(mobiliario, many=True)
-            print(serializer.data)
             jsonData = JSONRenderer().render(serializer.data)
             return Response(jsonData, status=200)
         return Response(NO_MYPE_RESPONSE, status=400)
@@ -203,35 +217,37 @@ class MobiliarioMantenimientoView(views.APIView):
         usuario = get_object_or_404(Usuario, username= self.request.user)
         if usuario.is_mype:
             data = JSONParser().parse(request)
-            serializer = MobiliarioMantenimientoFullSerializer(data=data)
+            # serializer = MobiliarioMantenimientoFullSerializer(data=data)
+            serializer = MobiliarioMantenimientoOnPostSerializer(data=data)
             if serializer.is_valid():
-                mobiliarioDatos = serializer.validated_data['mobiliario']
-                mantenimientoDatos = serializer.validated_data['mobiliarioMantenimiento']
-                try:
-                    mobiliarioInstancia = Mobiliario.objects.annotate(
-                            total_mantenimiento=Sum('mobiliarioenmantenimiento__cantidad')
-                        ).annotate(
-                            total_perdido=Sum('mobiliarioperdido__cantidad')
-                        ).get(id=mobiliarioDatos['id'])
+                serializer.save()
+                # mobiliarioDatos = serializer.validated_data['mobiliario']
+                # mantenimientoDatos = serializer.validated_data['mobiliarioMantenimiento']
+                # try:
+                #     mobiliarioInstancia = Mobiliario.objects.annotate(
+                #             total_mantenimiento=Sum('mobiliarioenmantenimiento__cantidad')
+                #         ).annotate(
+                #             total_perdido=Sum('mobiliarioperdido__cantidad')
+                #         ).get(id=mobiliarioDatos['id'])
                     
-                    totalMantenimiento = 0
-                    totalPerdido = 0
-                    if mobiliarioInstancia.total_mantenimiento is not None:
-                        totalMantenimiento = mobiliarioInstancia.total_mantenimiento
-                    if mobiliarioInstancia.total_perdido is not None:
-                        totalPerdido = mobiliarioInstancia.total_perdido
-                    if (mobiliarioInstancia.total-int(mantenimientoDatos['cantidad'])-totalPerdido-totalMantenimiento) < 0:
-                        response = {
-                            "Error": "El total del mobiliario es suficiente para realizar esta operacion",
-                        }
-                        return Response(response, status=400)    
-                    mantenimientoInstancia = MobiliarioEnMantenimiento.objects.create(mobiliario=mobiliarioInstancia, **mantenimientoDatos)  
-                    response = {
-                        "respuesta":"El mobiliario se puso en mantenimiento",
-                    }
-                    return Response(response, status=201)
-                except Mobiliario.DoesNotExist:
-                    raise Http404()
+                #     totalMantenimiento = 0
+                #     totalPerdido = 0
+                #     if mobiliarioInstancia.total_mantenimiento is not None:
+                #         totalMantenimiento = mobiliarioInstancia.total_mantenimiento
+                #     if mobiliarioInstancia.total_perdido is not None:
+                #         totalPerdido = mobiliarioInstancia.total_perdido
+                #     if (mobiliarioInstancia.total-int(mantenimientoDatos['cantidad'])-totalPerdido-totalMantenimiento) < 0:
+                #         response = {
+                #             "Error": "El total del mobiliario es suficiente para realizar esta operacion",
+                #         }
+                #         return Response(response, status=400)    
+                #     mantenimientoInstancia = MobiliarioEnMantenimiento.objects.create(mobiliario=mobiliarioInstancia, **mantenimientoDatos)  
+                response = {
+                    "respuesta":"El mobiliario se puso en mantenimiento",
+                }
+                return Response(response, status=201)
+                # except Mobiliario.DoesNotExist:
+                #     raise Http404()
             return JsonResponse(serializer.errors, status=400) 
         return Response(NO_MYPE_RESPONSE, status=400)
 
@@ -267,45 +283,47 @@ class MobiliarioMantenimientoView(views.APIView):
         usuario = get_object_or_404(Usuario, username= self.request.user)
         if usuario.is_mype:
             data = JSONParser().parse(request)
-            serializer = MantenimientoPutSerializer(data=data)
+            idM = data['id']
+            mantenimientoInstancia = get_object_or_404(MobiliarioEnMantenimiento, id=idM)
+            serializer = MobiliarioMantenimientoNuevoSerializer(mantenimientoInstancia, data=data, partial=True)
             if serializer.is_valid():
-                try:
-                    idM = serializer.validated_data['id']
-                    cantidad = serializer.validated_data['cantidad']
-                    fechaFin = serializer.validated_data['fechaFin']
-                    mantenimientoInstancia = get_object_or_404(MobiliarioEnMantenimiento, id=idM)
-                    cantidadActual = mantenimientoInstancia.cantidad
-                    mobiliario = Mobiliario.objects.annotate(
-                            total_mantenimiento=Sum('mobiliarioenmantenimiento__cantidad')
-                        ).annotate(
-                            total_perdido=Sum('mobiliarioperdido__cantidad')
-                        ).get(id=mantenimientoInstancia.mobiliario.id)
-                    totalMantenimiento = 0
-                    totalPerdido = 0
-                    if mobiliario.total_mantenimiento is not None:
-                        totalMantenimiento = mobiliario.total_mantenimiento
-                    if mobiliario.total_perdido is not None:
-                        totalPerdido = mobiliario.total_perdido
-                    if (mobiliario.total+ cantidadActual - cantidad - totalPerdido - totalMantenimiento) < 0:
-                        response = {
-                            "Error": "El total del mobiliario es insuficiente para realizar esta operacion",
-                        }
-                        return Response(response, status=400)
+                serializer.save()
+                # try:
+                #     cantidad = serializer.validated_data['cantidad']
+                #     fechaFin = serializer.validated_data['fechaFin']
+                #     cantidadActual = mantenimientoInstancia.cantidad
+                #     mobiliario = Mobiliario.objects.annotate(
+                #             total_mantenimiento=Sum('mobiliarioenmantenimiento__cantidad')
+                #         ).annotate(
+                #             total_perdido=Sum('mobiliarioperdido__cantidad')
+                #         ).get(id=mantenimientoInstancia.mobiliario.id)
+                #     totalMantenimiento = 0
+                #     totalPerdido = 0
+                #     if mobiliario.total_mantenimiento is not None:
+                #         totalMantenimiento = mobiliario.total_mantenimiento
+                #     if mobiliario.total_perdido is not None:
+                #         totalPerdido = mobiliario.total_perdido
+                #     if (mobiliario.total+ cantidadActual - cantidad - totalPerdido - totalMantenimiento) < 0:
+                #         response = {
+                #             "Error": "El total del mobiliario es insuficiente para realizar esta operacion",
+                #         }
+                #         return Response(response, status=400)
                     
-                    if mantenimientoInstancia.fechaInicio> fechaFin:
-                        response = {
-                            "Error": "La fecha de finalización no puede ocurrir antes que la fecha en que se registró el mobiliario en mantenimiento",
-                        }
-                        return Response(response, status=400)
-                    mantenimientoInstancia.cantidad = cantidad
-                    mantenimientoInstancia.fechaFin = fechaFin
-                    mantenimientoInstancia.save()
-                    response = {
-                        "resultado": "La operación ser realizó con éxito",
-                    }
-                    return Response(response, status=200)
-                except Mobiliario.DoesNotExist:
-                    raise Http404()
+                #     if mantenimientoInstancia.fechaInicio> fechaFin:
+                #         response = {
+                #             "Error": "La fecha de finalización no puede ocurrir antes que la fecha en que se registró el mobiliario en mantenimiento",
+                #         }
+                #         return Response(response, status=400)
+                    
+                #     mantenimientoInstancia.cantidad = cantidad
+                #     mantenimientoInstancia.fechaFin = fechaFin
+                #     mantenimientoInstancia.save()
+                response = {
+                    "resultado": "La operación ser realizó con éxito",
+                }
+                return Response(response, status=200)
+                # except Mobiliario.DoesNotExist:
+                #     raise Http404()
             return JsonResponse(serializer.errors, status=400) 
         return Response(NO_MYPE_RESPONSE, status=400)
     
@@ -504,3 +522,63 @@ class MobiliarioRentadoView(views.APIView):
             }
             return Response(response, status = 400)
         return Response(self.NO_MY_PERESPONSE, status=403)
+    
+
+@api_view(('GET',))
+@authentication_classes([])
+@permission_classes([])
+@renderer_classes((JSONRenderer,))
+def getInventarioPDF(request, userId):
+    idForm = IdMypeForm({"id":userId})
+    if idForm.is_valid():
+        user = get_object_or_404(Usuario, pk= userId)
+        if user.is_mype: 
+            Tz = pytz.timezone("America/Mexico_City")
+            hoy = datetime.now(Tz).date()
+            fechaIni = str(hoy) + ' 00:00Z'
+            fechaFin = str(hoy) + ' 23:59Z'
+            mypeObject = user.mype
+            total_mantenimiento_sum = mypeObject.mobiliario_set.annotate(
+                total_mantenimiento = Sum('mobiliarioenmantenimiento__cantidad')
+            ).filter(pk=OuterRef('pk'))
+            total_perdido_sum = mypeObject.mobiliario_set.annotate(
+                total_perdido = Sum('mobiliarioperdido__cantidad')
+            ).filter(pk=OuterRef('pk'))
+            pedidosQs = mypeObject.pedido_set.filter(
+                Q(fechaEntrega__lte = fechaIni, fechaRecoleccion__gte = fechaIni) |
+                Q(fechaEntrega__lte =fechaFin, fechaRecoleccion__gte = fechaFin) |
+                Q(fechaEntrega__gte = fechaIni, fechaRecoleccion__lte = fechaFin)
+            ).values_list("id", flat=True).order_by("id")
+            mobRentado = MobiliarioRentado.objects.filter(pedido_id__in = pedidosQs).values_list("id", flat=True).order_by("id")
+            total_rentado_sum = mypeObject.mobiliario_set.annotate(
+                total_rentado = Sum('mobiliariorentado__cantidad', filter=Q(mobiliariorentado__id__in=mobRentado))
+            ).filter(pk=OuterRef('pk'))
+            mobiliario = mypeObject.mobiliario_set.annotate(
+                total_mantenimiento = Coalesce(Subquery(total_mantenimiento_sum.values('total_mantenimiento'), output_field=IntegerField()), 0),
+                total_perdido = Coalesce(Subquery(total_perdido_sum.values('total_perdido'), output_field= IntegerField()), 0),
+                total_rentado = Coalesce(Subquery(total_rentado_sum.values('total_rentado'), output_field= IntegerField()), 0)
+            ).annotate(
+                disponible = F('total') - F('total_mantenimiento') - F('total_rentado') - F('total_perdido')
+            )
+            for m in mobiliario:
+                print(m.total - m.total_mantenimiento - m.total_rentado - m.total_perdido)
+                # setattr(m, 'disponible', m.total-m.)
+            direccionMype = mypeObject.direcciones.all()
+            context = {
+                'mobiliario': mobiliario,
+                'empresa': mypeObject,
+                'direccionMype': direccionMype,
+                'fecha': hoy,
+            }
+            html = render_to_string("inventario.html", context)
+            options = {
+                'page-size': 'Letter',
+                'orientation': 'Landscape',
+            }
+            pdf = generate_pdf(html, options = options)
+            response = HttpResponse(pdf, content_type='application/pdf')
+            response['Content-Disposition'] = 'inline; filename="iventario_{}.pdf"'.format(mypeObject.nombreEmpresa)
+            return response
+        return Response(NO_MYPE_RESPONSE, status=403)
+    errorResponse = '<!doctype html><html><head><title>Error</title></head><body>'+idForm.errors+'</body></html>'
+    return HttpResponse(errorResponse, status=400)

@@ -6,22 +6,24 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.permissions import IsAuthenticated
 from usuarios.models import Usuario, Cliente
 from .models import CargoExtra, Pedido
-from .serializers import CargoExtraSerializer, PedidoRegistroSerializer, PedidoSerializerOnPut, PedidoGetSerializer, PedidoParaListaSerializer, CargoExtraPostSerializer
-from django.http import JsonResponse
+from .serializers import CargoExtraSerializer, PedidoRegistroSerializer, PedidoSerializerOnPut, PedidoGetSerializer, PedidoParaListaSerializer, CargoExtraPostSerializer, PedidoParaClienteSerializer
+from django.http import JsonResponse, HttpResponse
 from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
-from django.db.models import Sum, FloatField, Subquery, OuterRef
+from django.db.models import Sum, FloatField, Subquery, OuterRef, Case, When
 from GestionInventario.constantes import NO_MYPE_RESPONSE, OPERACION_EXITOSA
 from GestionInventario.models import MobiliarioRentado, Mobiliario
 from django.http import Http404
 from .funciones import mobiliarioDisponibleEnPeriodo
-from GestionInventario.serializers import GetMobiliarioRentadoSerializer
+from GestionInventario.serializers import GetMobiliarioRentadoSerializer, MobiliarioRentadoClienteSerializer
 from django.db.models import F
 from django.template.loader import render_to_string
-from datetime import date, timedelta, datetime
+from datetime import timedelta, datetime
 import pytz
 import os
 from headless_pdfkit import generate_pdf
+from rest_framework.decorators import api_view, renderer_classes, authentication_classes, permission_classes
+from busquedaCotizacion.forms import IdMypeForm
 
 
 
@@ -146,7 +148,7 @@ class PedidoView(views.APIView):
         if user.is_mype:
             mype = user.mype
             data = JSONParser().parse(request)
-            serializer = PedidoRegistroSerializer(data=data)
+            serializer = PedidoRegistroSerializer(data=data) 
             if serializer.is_valid():
                 id_cliente = serializer.validated_data['cliente']
                 datosPedido = serializer.validated_data['pedido']
@@ -207,7 +209,6 @@ class PedidoView(views.APIView):
     
     def delete(self, request):
         user = get_object_or_404(Usuario, username = self.request.user)
-        print(user.is_mype)
         if user.is_mype:
             data = JSONParser().parse(request)
             serializer = PedidoSerializerOnPut(data = data, partial = True)
@@ -232,8 +233,13 @@ class PedidoView(views.APIView):
             pedido = get_object_or_404(Pedido, id = pedido_id)
             mobRentado = pedido.mobiliariorentado_set.all()
             cargosExtra = pedido.cargoextra_set.all()
-            pedidoSerializer = PedidoGetSerializer(pedido)
-            mobiliarioSerializer = GetMobiliarioRentadoSerializer(mobRentado, many = True)
+            if user.is_mype:
+                pedidoSerializer = PedidoGetSerializer(pedido)
+                mobiliarioSerializer = GetMobiliarioRentadoSerializer(mobRentado, many = True)
+            else:
+                pedidoSerializer = PedidoParaClienteSerializer(pedido)
+                mobiliarioSerializer = MobiliarioRentadoClienteSerializer(mobRentado, many=True)
+            print(mobiliarioSerializer.data)
             cargosSerializer = CargoExtraSerializer(cargosExtra, many=True)
             response = {
                 "pedido" : JSONRenderer().render(pedidoSerializer.data),
@@ -248,6 +254,15 @@ class PedidoView(views.APIView):
             pedidos = mype.pedido_set.annotate(
                 total_mobiliario = Subquery(precio_mobiliario_sum.values('total_mobiliario'), output_field=FloatField()),
                 total_cargos = Subquery(cargos_sum.values('total_cargos'), output_field=FloatField())
+            ).order_by(
+                Case(
+                    When(estado = 'Por entregar', then=1),
+                    When(estado = 'Entregado', then=2),
+                    When(estado = 'Por recoger', then=3),
+                    When(estado = 'Finalizado', then=4),
+                    default=5,
+                ),
+                'fechaEntrega',
             )
             
             serializer = PedidoParaListaSerializer(pedidos, many=True)
@@ -277,15 +292,13 @@ class PedidosEntregaView(views.APIView):
                     fechaIni = str(hoy) + ' 00:00Z'
                     fechaFin = str(dateFin) + ' 23:59Z'
                 mype = user.mype
-                print(fechaIni)
-                print(fechaFin)
                 precio_mobiliario_sum =mype.pedido_set.annotate(total_mobiliario = Sum(F('mobiliariorentado__precio')*F('mobiliariorentado__cantidad'))).filter(pk=OuterRef('pk'))
                 cargos_sum = mype.pedido_set.select_related('cliente').annotate(total_cargos = Sum('cargoextra__precio')).filter(pk=OuterRef('pk'))
                 pedidosQS1 = None
                 if 'entregar' in header:
-                    pedidosQS1 = mype.pedido_set.filter(fechaEntrega__gte = fechaIni).filter(fechaEntrega__lte = fechaFin).filter(estado="Por entregar").order_by('fechaEntrega')
+                    pedidosQS1 = mype.pedido_set.filter(fechaEntrega__lte = fechaFin).filter(estado="Por entregar").order_by('fechaEntrega')
                 else:
-                    pedidosQS1 =mype.pedido_set.filter(fechaRecoleccion__gte = fechaIni).filter(fechaRecoleccion__lte = fechaFin).filter(estado="Entregado").order_by('fechaRecoleccion')
+                    pedidosQS1 =mype.pedido_set.filter(fechaRecoleccion__lte = fechaFin).filter(estado="Entregado").order_by('fechaRecoleccion')
                 pedidos = pedidosQS1.select_related('cliente').annotate(
                     total_mobiliario = Subquery(precio_mobiliario_sum.values('total_mobiliario'), output_field=FloatField()),
                     total_cargos = Subquery(cargos_sum.values('total_cargos'), output_field=FloatField())
@@ -352,6 +365,53 @@ class GenerarPDFView(views.APIView):
                 "error": "No se encontro el header esperado Pedido-Id",
             }
         return Response(NO_MYPE_RESPONSE, status=400)
+    
+@api_view(('GET',))
+@authentication_classes([])
+@permission_classes([])
+@renderer_classes((JSONRenderer,))
+def getPedidoPDF(request, id, userId):
+    idForm = IdMypeForm({"id":id})
+    if idForm.is_valid():
+        user = get_object_or_404(Usuario, pk= userId)
+        mype = user.mype
+        pedido = get_object_or_404(Pedido, id = id)
+        cliente = get_object_or_404(Cliente, id = pedido.cliente_id)
+        direccionCli = cliente.direcciones.all()
+        direccionMype = mype.direcciones.all()
+        mobRentado = pedido.mobiliariorentado_set.all().annotate(subtotal = F('cantidad') * F('precio'))
+        agTotal = mobRentado.aggregate(total_mobiliario=Sum(F('cantidad')*F('precio')))
+        cargosExtra = pedido.cargoextra_set.all()
+        agCargos = cargosExtra.aggregate(total_cargos=Sum(F('precio')))
+        numTotalMob = 0
+        numTotalCargos = 0
+        numPagado = 0
+        if not agTotal['total_mobiliario'] is None:
+            numTotalMob =  agTotal['total_mobiliario']
+        if not agCargos['total_cargos'] is None:
+            numTotalCargos = agCargos['total_cargos']
+        if not pedido.pagoRecibido is None:
+            numPagado = pedido.pagoRecibido
+        context = {
+            'pedido': pedido,
+            'cliente': cliente,
+            'mobRentado': mobRentado,
+            'cargosExtra': cargosExtra,
+            'total': numTotalMob + numTotalCargos,
+            'mype': mype,
+            'direccionCli': direccionCli,
+            'direccionMype': direccionMype,
+            'adeudo': numTotalCargos + numTotalMob - numPagado,
+        }
+        html = render_to_string("pedido.html", context)
+        pdf = generate_pdf(html)
+        response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = 'inline; filename="pedido_{}_{}.pdf"'.format(mype.nombreEmpresa, pedido.id)
+        return response
+    errorResponse = '<!doctype html><html><head><title>Error</title></head><body>'+idForm.errors+'</body></html>'
+    return HttpResponse(errorResponse, status=400)
+
+
 
 
 

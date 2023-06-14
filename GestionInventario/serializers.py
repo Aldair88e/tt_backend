@@ -1,5 +1,9 @@
 from rest_framework import serializers
 from .models import Mobiliario, MobiliarioEnMantenimiento, MobiliarioPerdido, MobiliarioRentado
+from busquedaCotizacion.utils import mobiliarioDisponibleEnPeriodo
+from .utils import add_months
+from datetime import date
+from django.shortcuts import get_object_or_404
 
 class MobiliarioSerializer(serializers.ModelSerializer):
     imagen = serializers.ImageField(max_length=None, use_url=True)
@@ -108,11 +112,56 @@ class GetMobiliarioRentadoSerializer(serializers.ModelSerializer):
         fields = ['cantidad', 'precio', 'id', 'mobiliario']
         read_only_field = ['mobiliario', 'id']
 
-# class MobiliarioRentadoListaSerializer(serializers.ModelSerializer):
-#     mobiliario = serializers.StringRelatedField()
-#     pedido = PedidoParaMobiliarioSerializer()
-#     class Meta:
-#         model = MobiliarioRentado
-#         fields = ['cantidad', 'mobiliario', 'pedido']
-        
 
+class MobiliarioClienteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Mobiliario
+        fields = ['nombre', 'id']
+
+class MobiliarioRentadoClienteSerializer(serializers.ModelSerializer):
+    mobiliario = MobiliarioClienteSerializer()
+    class Meta:
+        model = MobiliarioRentado
+        fields = ['mobiliario', 'cantidad', 'precio']       
+
+
+class MobiliarioMantenimientoNuevoSerializer(serializers.ModelSerializer):
+    mobiliario = serializers.PrimaryKeyRelatedField(queryset = Mobiliario.objects.all())
+    class Meta:
+        model = MobiliarioEnMantenimiento
+        fields = '__all__'
+    
+    def validate(self, data):
+        fechaFin = data.get('fechaFin')
+        fechaInicio = self.instance.fechaInicio
+        if fechaFin is not None and fechaInicio > fechaFin:
+            raise serializers.ValidationError('La fecha de fin no puede ser menor a la de inicio')
+        mobiliario = self.instance.mobiliario
+        if fechaFin is None:
+            fechaFin = add_months(fechaInicio, 3)
+        disponibilidad = mobiliarioDisponibleEnPeriodo(mobiliario, fechaFin, fechaInicio)
+        if disponibilidad < data['cantidad']:
+            raise serializers.ValidationError('No hay suficientes artículos disponibles')
+        return data
+    
+class MobiliarioMantenimientoOnPostSerializer(serializers.ModelSerializer):
+    mobiliario = serializers.PrimaryKeyRelatedField(queryset = Mobiliario.objects.all())
+    fechaFin = serializers.DateField(allow_null=True)
+    class Meta:
+        model = MobiliarioEnMantenimiento
+        fields = '__all__'
+    
+    def validate(self, data):
+        fechaFin = data.get('fechaFin')
+        fechaInicio = date.today()
+        if fechaFin is not None and fechaInicio > fechaFin:
+            raise serializers.ValidationError('La fecha de fin no puede ser menor a la de inicio')
+        mobiliario = data['mobiliario']
+        # mobiliario = get_object_or_404(Mobiliario, pk=data['mobiliario'])
+        if fechaFin is None:
+            fechaFin = add_months(fechaInicio, 3)
+        disponibilidad = mobiliarioDisponibleEnPeriodo(mobiliario, fechaFin, fechaInicio)
+        if disponibilidad < data['cantidad']:
+            raise serializers.ValidationError('No hay suficientes artículos disponibles')
+        return data
+        

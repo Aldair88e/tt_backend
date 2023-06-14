@@ -12,12 +12,23 @@ from rest_framework.renderers import JSONRenderer
 from django.db.models import Sum, Count, FloatField, Subquery, OuterRef, IntegerField, F
 from GestionInventario.serializers import MobiliarioPerdidoPorClienteSerializer
 from gestionPedidos.serializers import PedidoParaHistorialClienteSerializer
+from rest_framework.decorators import api_view, renderer_classes, authentication_classes, permission_classes
+from busquedaCotizacion.forms import IdMypeForm
+from django.template.loader import render_to_string
+from datetime import datetime
+import pytz
+from headless_pdfkit import generate_pdf
+from GestionInventario.constantes import NO_MYPE_RESPONSE, NO_SE_ENCOTRO, TOTAL_INSUFICIENTE, OPERACION_EXITOSA
+from django.http import Http404, HttpResponse
+from django.db.models.functions import Coalesce
+from gestionPedidos.models import Pedido
 # from usuarios.serializers import RegistroClienteSerializer
 # Create your views here.
 
 class ClientePorTelefonoView(views.APIView):
     authentication_classes = [TokenAuthentication]
     permission_classes = [IsAuthenticated]
+    
     USUARIONOMYPE = {
         "resultado": "El usuario no es de tipo MYPE",
     }
@@ -34,11 +45,10 @@ class ClientePorTelefonoView(views.APIView):
             if serializer.is_valid():
                 clienteData = serializer.validated_data['cliente']
                 direccionData = serializer.validated_data['direccion']
-                descuento = serializer.validated_data['descuento']
                 cliente = Cliente.objects.create(**clienteData)
                 direccion = Direccion.objects.create(**direccionData)
                 cliente.direcciones.add(direccion)
-                clienteTelefono = ClientePorTelefono.objects.create(descuento=descuento, cliente=cliente, mype=mype)
+                clienteTelefono = ClientePorTelefono.objects.create(cliente=cliente, mype=mype)
                 response = {
                     "mensaje": "El cliente se agregó correctamente",
                 }
@@ -55,13 +65,11 @@ class ClientePorTelefonoView(views.APIView):
             if serializer.is_valid():
                 cliente_data = serializer.validated_data.pop('cliente')
                 direcciones_data = serializer.validated_data.pop('direcciones')
-                descuento = serializer.validated_data.pop('descuento')
                 instancias = mype.clienteportelefono_set.filter(pk=cliente_data['id'])
                 if instancias.exists():
                     direcciones = []
                     for i in instancias:
                         cliente = i.cliente
-                        i.descuento = descuento
                         cliente.nombre = cliente_data['nombre']
                         cliente.apellido1 = cliente_data['apellido1']
                         cliente.apellido2 = cliente_data['apellido2']
@@ -116,10 +124,15 @@ class ClientePorTelefonoView(views.APIView):
                                 "resultado" : "Los datos del cliente se eliminaron correctamente",
                             }
                             return Response(response, status=200)
-                        response = {
-                            "resultado" : "No tienes permisos para eliminar este registro",
-                        }
-                        return Response(response, status=403)
+                else:
+                    cliente = get_object_or_404(Cliente, pk=serializer.validated_data['id'])
+                    pedidos = mype.pedido_set.filter(cliente_id = cliente.id)
+                    for p in pedidos:
+                        p.delete()
+                    response = {
+                        "resultado" : "Los datos del cliente se eliminaron correctamente",
+                    }
+                    return Response(response, status=200)
                 response = {
                     "resultado" : "No se pudo encontrar el registro",
                 }
@@ -137,10 +150,22 @@ class ClientePorTelefonoView(views.APIView):
             cliente_id = request.headers['Cliente-Id']
             cliente = get_object_or_404(Cliente, id=cliente_id)
             if cliente.is_web:
+                mobiliarioPerdido = cliente.mobiliarioperdido_set.all()
+                precio_mobiliario_sum =cliente.pedido_set.annotate(total_mobiliario = Sum(F('mobiliariorentado__precio')*F('mobiliariorentado__cantidad'))).filter(pk=OuterRef('pk'))
+                cargos_sum = cliente.pedido_set.annotate(total_cargos = Sum('cargoextra__precio')).filter(pk=OuterRef('pk'))
+                pedidos = cliente.pedido_set.annotate(
+                    total_mobiliario = Subquery(precio_mobiliario_sum.values('total_mobiliario'), output_field=FloatField()),
+                    total_cargos = Subquery(cargos_sum.values('total_cargos'), output_field=FloatField())
+                )
+                serializerCliente = GetClienteSerializer(cliente)
+                serializerMobPerdido = MobiliarioPerdidoPorClienteSerializer(mobiliarioPerdido, many=True)
+                serializerPedido = PedidoParaHistorialClienteSerializer(pedidos, many=True)
                 response = {
-                    "resultado": "el cliente es web",
+                    "cliente" : JSONRenderer().render(serializerCliente.data),
+                    "mobPerdido" : JSONRenderer().render(serializerMobPerdido.data),
+                    "pedidos" : JSONRenderer().render(serializerPedido.data),
                 }
-                return Response(response, 200)
+                return Response(response, status=200)
             clientePorTel = mype.clienteportelefono_set.filter(pk=cliente_id)
             if clientePorTel.exists():
                 for cpt in clientePorTel:
@@ -179,32 +204,43 @@ class ListaClientesView(views.APIView):
         user = get_object_or_404(Usuario, username=self.request.user)
         if user.is_mype:
             mype = user.mype
-            clientesPorTel = mype.clienteportelefono_set.all()
-            mobiliarioPerdidoInfo = Cliente.objects.annotate(
-                mobiliario_perdido = Sum('mobiliarioperdido__cantidad'),
-                mobPerdido_adeudo = Sum('mobiliarioperdido__totalReposicion'),
-                mobPerdido_pagado = Sum('mobiliarioperdido__pagoRecibido')
-            ).filter(pk=OuterRef('pk'))
-            pedidoInfo = Cliente.objects.annotate(
-                total_pedidos = Count('pedido')
-            ).filter(pk=OuterRef('pk'))
-            # clientesQS = Cliente.objects.annotate(
-            #     mobiliario_perdido=Sum('mobiliarioperdido__cantidad')
-            #     ).annotate(
-            #     mobPerdido_adeudo = Sum('mobiliarioperdido__totalReposicion')
-            #     ).annotate(
-            #     mobPerdido_pagado = Sum('mobiliarioperdido__pagoRecibido')
-            #     ).annotate(
-            #     descuento = Sum('clienteportelefono__descuento')
-            #     )
-            clientesQS = Cliente.objects.annotate(
-                mobiliario_perdido=Subquery(mobiliarioPerdidoInfo.values('mobiliario_perdido'), output_field = IntegerField()),
-                mobPerdido_adeudo = Subquery(mobiliarioPerdidoInfo.values('mobPerdido_adeudo'), output_field = FloatField()),
-                mobPerdido_pagado = Subquery(mobiliarioPerdidoInfo.values('mobPerdido_pagado'), output_field = FloatField()),
-                total_pedidos = Subquery(pedidoInfo.values('total_pedidos'), output_field = IntegerField()),
+            pedidosQS1 = Pedido.objects.filter(pk = OuterRef('pedido__id')).annotate(
+                adeudo_pedido = Coalesce(Sum(F('mobiliariorentado__precio') * F('mobiliariorentado__cantidad')), 0, output_field=FloatField())
+            ).values('adeudo_pedido')
+            pedidosQS2 = Pedido.objects.filter(pk = OuterRef('pedido__id')).annotate(
+                adeudo_cargos = Coalesce(Sum('cargoextra__precio'), 0, output_field=FloatField())
+            ).values('adeudo_cargos')
+
+            pedidosQS3 = Cliente.objects.filter(pk = OuterRef('pk')).annotate(pedidos_cobrado = Coalesce(Sum('pedido__pagoRecibido'), 0, output_field=FloatField())).values('pedidos_cobrado')
+     
+            mobiliario_perdido_cantidad = Cliente.objects.annotate(
+            mobiliario_perdido = Sum('mobiliarioperdido__cantidad', output_field=IntegerField())).filter(pk=OuterRef('pk'))
+
+            mobPerdido_adeudo_qs = Cliente.objects.filter(pk=OuterRef('pk')).annotate(
+                mobPerdido_adeudo = Coalesce(Sum('mobiliarioperdido__totalReposicion'), 0, output_field=FloatField()) - Coalesce(Sum('mobiliarioperdido__pagoRecibido'), 0,output_field=FloatField())
                 )
-            clientesMype = clientesQS.filter(id__in=clientesPorTel).prefetch_related('direcciones')
-            serializer = ClienteParaListaSerializer(clientesMype, many=True)
+
+            pedidoInfo = Cliente.objects.filter(pk=OuterRef('pk')).annotate(
+                total_pedidos = Count('pedido', output_field=IntegerField())
+            )
+
+            clientesQS = Cliente.objects.annotate(
+                mobiliario_perdido=Coalesce(Subquery(mobiliario_perdido_cantidad.values('mobiliario_perdido')[:1], output_field = IntegerField()), 0, output_field=IntegerField()),
+                mobPerdido_adeudo = Subquery(mobPerdido_adeudo_qs.values('mobPerdido_adeudo')[:1], output_field = FloatField()),
+                total_pedidos = Subquery(pedidoInfo.values('total_pedidos')[:1], output_field = IntegerField()),
+                adeudos_pedido=Coalesce(Sum(Subquery(pedidosQS1, output_field=FloatField())), 0, output_field=FloatField()),
+                adeudos_cargos = Coalesce(Sum(Subquery(pedidosQS2, output_field=FloatField())), 0, output_field=FloatField()),
+                pagos_recibidos = Coalesce(Subquery(pedidosQS3, output_field=FloatField()), 0, output_field=FloatField())
+                ).annotate(
+                    adeudo = F('mobPerdido_adeudo') + F('adeudos_pedido') + F('adeudos_cargos') - F('pagos_recibidos')
+                )
+            
+            pedidos = mype.pedido_set.all().values_list('cliente_id', flat=True)
+            clientesTel = mype.clienteportelefono_set.exclude(pk__in=pedidos).values_list('pk', flat=True)
+            clientesMype = clientesQS.filter(id__in=pedidos).prefetch_related('direcciones')
+            clientesTel = clientesQS.filter(id__in=clientesTel).prefetch_related('direcciones')
+            clientesTotal = clientesMype | clientesTel
+            serializer = ClienteParaListaSerializer(clientesTotal, many=True)
             jsonData = JSONRenderer().render(serializer.data)
             return Response(jsonData, status=200)
         return  Response(self.USUARIONOMYPE, status = 403)
@@ -226,3 +262,118 @@ class ClientesShortView(views.APIView):
             jsonData = JSONRenderer().render(serializer.data)
             return Response(jsonData, status=200)
         return  Response(self.USUARIONOMYPE, status = 403)
+    
+@api_view(('GET',))
+@authentication_classes([])
+@permission_classes([])
+@renderer_classes((JSONRenderer,))
+def getListaClientesPDF(request, userId):
+    idForm = IdMypeForm({"id":userId})
+    if idForm.is_valid():
+        user = get_object_or_404(Usuario, pk= userId)
+        if user.is_mype: 
+            Tz = pytz.timezone("America/Mexico_City")
+            hoy = datetime.now(Tz).date()
+            mypeObject = user.mype
+
+            pedidosQS1 = Pedido.objects.filter(pk = OuterRef('pedido__id')).annotate(
+                adeudo_pedido = Coalesce(Sum(F('mobiliariorentado__precio') * F('mobiliariorentado__cantidad')), 0, output_field=FloatField())
+            ).values('adeudo_pedido')
+            pedidosQS2 = Pedido.objects.filter(pk = OuterRef('pedido__id')).annotate(
+                adeudo_cargos = Coalesce(Sum('cargoextra__precio'), 0, output_field=FloatField())
+            ).values('adeudo_cargos')
+
+            pedidosQS3 = Cliente.objects.filter(pk = OuterRef('pk')).annotate(pedidos_cobrado = Coalesce(Sum('pedido__pagoRecibido'), 0, output_field=FloatField())).values('pedidos_cobrado')
+     
+            mobiliario_perdido_cantidad = Cliente.objects.annotate(
+            mobiliario_perdido = Sum('mobiliarioperdido__cantidad', output_field=IntegerField())).filter(pk=OuterRef('pk'))
+
+            mobPerdido_adeudo_qs = Cliente.objects.filter(pk=OuterRef('pk')).annotate(
+                mobPerdido_adeudo = Coalesce(Sum('mobiliarioperdido__totalReposicion'), 0, output_field=FloatField()) - Coalesce(Sum('mobiliarioperdido__pagoRecibido'), 0,output_field=FloatField())
+                )
+
+            pedidoInfo = Cliente.objects.filter(pk=OuterRef('pk')).annotate(
+                total_pedidos = Count('pedido', output_field=IntegerField())
+            )
+
+            clientesQS = Cliente.objects.annotate(
+                mobiliario_perdido=Coalesce(Subquery(mobiliario_perdido_cantidad.values('mobiliario_perdido')[:1], output_field = IntegerField()), 0, output_field=IntegerField()),
+                mobPerdido_adeudo = Subquery(mobPerdido_adeudo_qs.values('mobPerdido_adeudo')[:1], output_field = FloatField()),
+                total_pedidos = Subquery(pedidoInfo.values('total_pedidos')[:1], output_field = IntegerField()),
+                adeudos_pedido=Coalesce(Sum(Subquery(pedidosQS1, output_field=FloatField())), 0, output_field=FloatField()),
+                adeudos_cargos = Coalesce(Sum(Subquery(pedidosQS2, output_field=FloatField())), 0, output_field=FloatField()),
+                pagos_recibidos = Coalesce(Subquery(pedidosQS3, output_field=FloatField()), 0, output_field=FloatField())
+                ).annotate(
+                    adeudo = F('mobPerdido_adeudo') + F('adeudos_pedido') + F('adeudos_cargos') - F('pagos_recibidos')
+                )
+            
+            pedidos = mypeObject.pedido_set.all().values_list('cliente_id', flat=True)
+            clientesTel = mypeObject.clienteportelefono_set.exclude(pk__in=pedidos).values_list('pk', flat=True)
+            clientesMype = clientesQS.filter(id__in=pedidos).prefetch_related('direcciones')
+            clientesTel = clientesQS.filter(id__in=clientesTel).prefetch_related('direcciones')
+            clientesTotal = clientesMype | clientesTel
+            direccionMype = mypeObject.direcciones.all()
+            context = {
+                'clientes': clientesTotal,
+                'empresa': mypeObject,
+                'direccionMype': direccionMype,
+                'fecha': hoy,
+            }
+            html = render_to_string("listaClientes.html", context)
+            options = {
+                'page-size': 'Letter',
+                'orientation': 'Landscape',
+            }
+            pdf = generate_pdf(html, options = options)
+            response = HttpResponse(pdf, content_type='application/pdf')
+            response['Content-Disposition'] = 'inline; filename="listaClientes_{}.pdf"'.format(mypeObject.nombreEmpresa)
+            return response
+        return Response(NO_MYPE_RESPONSE, status=403)
+    errorResponse = '<!doctype html><html><head><title>Error</title></head><body>'+idForm.errors+'</body></html>'
+    return HttpResponse(errorResponse, status=400)
+
+@api_view(('GET',))
+@authentication_classes([])
+@permission_classes([])
+@renderer_classes((JSONRenderer,))
+def getClientePDF(request, userId, clienteId):
+    idForm = IdMypeForm({"id":userId})
+    if idForm.is_valid():
+        user = get_object_or_404(Usuario, pk= userId)
+        if user.is_mype: 
+            mypeObject = user.mype
+            cliente = get_object_or_404(Cliente, id=clienteId)
+            mobiliarioPerdido = cliente.mobiliarioperdido_set.all().annotate(
+                adeudo = Coalesce(F('totalReposicion'), 0, output_field=FloatField()) - Coalesce(F('pagoRecibido'), 0, output_field=FloatField())
+            )
+            precio_mobiliario_sum =cliente.pedido_set.annotate(total_mobiliario = Sum(F('mobiliariorentado__precio')*F('mobiliariorentado__cantidad'))).filter(pk=OuterRef('pk'))
+            cargos_sum = cliente.pedido_set.annotate(total_cargos = Sum('cargoextra__precio')).filter(pk=OuterRef('pk'))
+            pedidos = cliente.pedido_set.annotate(
+                total_mobiliario = Coalesce(Subquery(precio_mobiliario_sum.values('total_mobiliario')), 0, output_field=FloatField()),
+                total_cargos = Coalesce(Subquery(cargos_sum.values('total_cargos')), 0, output_field=FloatField())
+            ).annotate(
+                adeudo = F('total_mobiliario') + F('total_cargos') - F('pagoRecibido')
+            ).annotate(
+                total = F('total_mobiliario') + F('total_cargos')
+            )
+           
+            direccionMype = mypeObject.direcciones.all()
+            context = {
+                'cliente': cliente,
+                'empresa': mypeObject,
+                'direccionMype': direccionMype,
+                'mobiliarioPerdido': mobiliarioPerdido,
+                'pedidos': pedidos,
+            }
+            html = render_to_string("cliente.html", context)
+            options = {
+                'page-size': 'Letter',
+                'orientation': 'Landscape',
+            }
+            pdf = generate_pdf(html, options = options)
+            response = HttpResponse(pdf, content_type='application/pdf')
+            response['Content-Disposition'] = 'inline; filename="lientes_{}_{}.pdf"'.format(cliente.id, mypeObject.nombreEmpresa)
+            return response
+        return Response(NO_MYPE_RESPONSE, status=403)
+    errorResponse = '<!doctype html><html><head><title>Error</title></head><body>'+idForm.errors+'</body></html>'
+    return HttpResponse(errorResponse, status=400)

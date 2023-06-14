@@ -48,10 +48,11 @@ class Mype(models.Model):
     facebook = models.URLField(blank=True)
     twitter = models.URLField(blank=True)
     instagram = models.URLField(blank=True)
+    imagen = models.ImageField(default='img/default.jpg', upload_to= 'img/')
 
 class ClienteWeb(models.Model):
     cliente = models.OneToOneField(Cliente, on_delete=models.CASCADE)
-    usuario = models.OneToOneField(Usuario, on_delete=models.CASCADE)
+    usuario = models.OneToOneField(Usuario, on_delete=models.CASCADE, primary_key=True)
 
 class ClientePorTelefono(models.Model):
     cliente = models.OneToOneField(
@@ -59,5 +60,4 @@ class ClientePorTelefono(models.Model):
         on_delete=models.CASCADE,
         primary_key=True,
     )
-    descuento = models.FloatField(default=0)
     mype = models.ForeignKey(Mype, on_delete=models.CASCADE)

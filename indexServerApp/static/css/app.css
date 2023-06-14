@@ -644,18 +644,6 @@ img {
   background-color: #40558A;
 }
 
-.bigger-button {
-  width: 17.5rem;
-}
-
-.disabled {
-  background-color: #7a8bb6;
-}
-.disabled:hover {
-  cursor: auto;
-  border: none;
-}
-
 .secondary-button {
   background-color: #FFFFFF;
   height: 3rem;
@@ -668,6 +656,18 @@ img {
   cursor: pointer;
   border: 1px solid #FFFFFF;
   background-color: #F9F9F9;
+}
+
+.bigger-button {
+  width: 17.5rem;
+}
+
+.disabled {
+  background-color: #7a8bb6;
+}
+.disabled:hover {
+  cursor: auto;
+  border: none;
 }
 
 .div-tipos {
@@ -703,7 +703,7 @@ img {
 .seleccionado {
   border-right: 1px solid black;
   border-left: 1px solid black;
-  background-color: #40558A;
+  background-color: #AB0635;
 }
 
 .errorP {
@@ -1055,6 +1055,14 @@ select:invalid {
   align-items: center;
 }
 
+.contenedorImgMype {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: start;
+  row-gap: 1rem;
+}
+
 .cursor-pointer:hover {
   cursor: pointer;
 }
@@ -1168,6 +1176,7 @@ table {
 .form-input-inventario {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   width: 80%;
 }
 
@@ -1697,6 +1706,500 @@ table {
 
 .paddingRight {
   padding-right: 2rem;
+}
+
+.contenedorImg {
+  background-image: url("http://localhost:3000/img/background.jpg");
+  background-repeat: no-repeat;
+  background-size: cover;
+  height: 30rem;
+  width: 78rem;
+}
+
+.contenedorImg::before {
+  width: 15rem;
+  height: 36rem;
+  border-radius: 0 50% 50% 0;
+  background-color: transparent;
+  display: inline-block;
+  vertical-align: baseline;
+  content: "";
+  box-shadow: 4rem 0 #fff;
+  position: relative;
+  left: -15rem;
+  top: -3rem;
+}
+
+.ladoDerecho {
+  height: 30rem;
+  width: fit-content;
+  overflow: hidden;
+}
+
+.headerBuscar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem 1rem;
+  margin: 1rem 0;
+  border-top: 1px solid #AEAEAF;
+  border-bottom: 1px solid #AEAEAF;
+  overflow: visible;
+}
+
+.ladoIzquierdo {
+  width: fit-content;
+}
+.ladoIzquierdo h2 {
+  margin: 0 0 2rem 0;
+  font-size: 2.8rem;
+}
+
+.contenedorHome {
+  padding: 0 4rem;
+}
+
+.buscador {
+  width: 50rem;
+  height: 5rem;
+  padding: 2rem;
+  border: none;
+  background-color: #ECECEC;
+  border-radius: 2rem 0 0 2rem;
+}
+.buscador:focus {
+  outline: 2px solid #AEAEAF;
+}
+
+.buttonBuscar {
+  background-color: #2F457D;
+  width: 12rem;
+  height: 5rem;
+  border: none;
+  color: #FFFFFF;
+  font-size: 1.6rem;
+  font-weight: bold;
+  border-radius: 0 2rem 2rem 0;
+}
+.buttonBuscar:hover {
+  cursor: pointer;
+  background-color: #40558A;
+}
+
+.seccionHome {
+  padding: 5rem;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+}
+
+.borderBottom {
+  border-bottom: 1px solid #AEAEAF;
+}
+
+.puntoDescripcion {
+  max-width: 20rem;
+}
+
+.center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.autocomplete {
+  /*the container must be positioned relative:*/
+  position: relative;
+  display: inline-block;
+  z-index: 98;
+}
+
+.autocomplete-items {
+  margin-top: 0.5rem;
+  border-radius: 2rem;
+  position: absolute;
+  border: 1px solid #AEAEAF;
+  border-bottom: none;
+  border-top: none;
+  z-index: 99;
+  /*position the autocomplete items to be the same width as the container:*/
+  top: 100%;
+  left: 0;
+  right: 0;
+}
+.autocomplete-items div {
+  padding: 10px;
+  cursor: pointer;
+  background-color: #ECECEC;
+  border-bottom: 1px solid #AEAEAF;
+}
+.autocomplete-items div:first-child {
+  border-radius: 2rem 2rem 0 0;
+}
+.autocomplete-items div:last-child {
+  border-radius: 0 0 2rem 2rem;
+}
+
+.autocomplete-items div:hover {
+  /*when hovering an item:*/
+  background-color: #AEAEAF;
+}
+
+.autocomplete-active {
+  /*when navigating through the items using the arrow keys:*/
+  background-color: DodgerBlue !important;
+  color: #ffffff;
+}
+
+.lds-ellipsis {
+  display: inline-block;
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.lds-ellipsis div {
+  position: absolute;
+  top: 33px;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: #AEAEAF;
+  animation-timing-function: cubic-bezier(0, 1, 1, 0);
+}
+
+.lds-ellipsis div:nth-child(1) {
+  left: 8px;
+  animation: lds-ellipsis1 0.6s infinite;
+}
+
+.lds-ellipsis div:nth-child(2) {
+  left: 8px;
+  animation: lds-ellipsis2 0.6s infinite;
+}
+
+.lds-ellipsis div:nth-child(3) {
+  left: 32px;
+  animation: lds-ellipsis2 0.6s infinite;
+}
+
+.lds-ellipsis div:nth-child(4) {
+  left: 56px;
+  animation: lds-ellipsis3 0.6s infinite;
+}
+
+@keyframes lds-ellipsis1 {
+  0% {
+    transform: scale(0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@keyframes lds-ellipsis3 {
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(0);
+  }
+}
+@keyframes lds-ellipsis2 {
+  0% {
+    transform: translate(0, 0);
+  }
+  100% {
+    transform: translate(24px, 0);
+  }
+}
+.autocomplete-loading {
+  position: absolute;
+  display: flex;
+  align-items: start;
+  justify-content: center;
+  width: 100%;
+  height: 10rem;
+  background-color: #ECECEC;
+  border: 1px solid #AEAEAF;
+  border-radius: 2rem;
+  margin-top: 1rem;
+}
+
+.contenidoResultados {
+  margin: 2rem 3rem;
+}
+
+.headerResultados {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #AEAEAF;
+  padding: 1rem;
+}
+.headerResultados h2 {
+  font-size: 2rem;
+  margin: 0;
+}
+.headerResultados:hover {
+  cursor: pointer;
+}
+
+.botonTipoBusqueda {
+  width: 14rem;
+  height: 4rem;
+  border: none;
+  background-color: #2F457D;
+  color: #FFFFFF;
+}
+
+.botonIzquierdo {
+  border-radius: 1rem 0 0 1rem;
+}
+
+.botonDerecho {
+  border-radius: 0 1rem 1rem 0;
+}
+
+.enfasis {
+  background-color: #AB0635;
+}
+
+.contenedorTarjetas {
+  padding: 1rem;
+  display: flex;
+  align-items: start;
+  justify-content: start;
+  gap: 1.5rem;
+}
+
+.tarjetaEmpresa {
+  width: 25rem;
+  height: 35rem;
+  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.45);
+  border-radius: 2rem;
+}
+
+.informacionEmpresa {
+  padding: 1rem 0.8rem;
+  font-size: 1.2rem;
+}
+.informacionEmpresa h3 {
+  font-size: 1.4rem;
+  margin: 0;
+}
+
+.contenedorImgTarjeta {
+  max-height: 65%;
+  height: auto;
+  overflow: hidden;
+}
+.contenedorImgTarjeta img {
+  border-radius: 2rem 2rem 0 0;
+}
+
+.contenedorCalificaciones {
+  margin-top: 0.5rem;
+  display: flex;
+  align-items: start;
+  justify-content: start;
+  column-gap: 0.8rem;
+}
+
+.contenidoConsultarMype {
+  width: 95%;
+  box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.45);
+  margin-bottom: 5rem;
+  border-radius: 0 0 2rem 2rem;
+}
+
+.headerConsultarMype {
+  padding: 1rem;
+  margin: 1rem;
+  display: flex;
+  align-items: start;
+  justify-content: start;
+  column-gap: 4rem;
+  border-bottom: 1px solid #AEAEAF;
+}
+.headerConsultarMype h1 {
+  margin: 0;
+  margin-bottom: 4rem;
+  font-size: 2.4rem;
+}
+.headerConsultarMype p {
+  margin: 0;
+}
+
+.headerImg {
+  width: 20rem;
+  height: 20rem;
+}
+.headerImg img {
+  border-radius: 2rem;
+}
+
+.contenedorIconoTexto {
+  display: flex;
+  align-items: center;
+  justify-content: start;
+  column-gap: 1rem;
+}
+
+.seccionArticulosOfrecidos {
+  padding: 1rem;
+  margin: 1rem;
+  border-bottom: 1px solid #AEAEAF;
+}
+.seccionArticulosOfrecidos h2 {
+  font-size: 1.8rem;
+  margin: 0;
+  margin-bottom: 1rem;
+}
+.seccionArticulosOfrecidos:last-child {
+  border-bottom: none;
+}
+
+.contenedorTablaArticulosOfrecidos {
+  width: 80rem;
+}
+
+.centradoBusquedaCotizacion {
+  display: flex;
+  align-items: start;
+  justify-content: center;
+}
+
+.contenedorBotonCotizar {
+  width: 100%;
+  padding-bottom: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: end;
+}
+
+.textoVentanaEmergente {
+  padding: 0 2rem;
+}
+
+.contenedorLinksRS {
+  display: flex;
+  align-items: start;
+  justify-content: start;
+  column-gap: 1rem;
+}
+
+.loading-contenedor {
+  width: 100%;
+  height: fit-content;
+  display: flex;
+  align-items: start;
+  justify-content: center;
+}
+
+.contenedorArticulosOfrecidosPrivado {
+  width: 100rem;
+}
+
+.ventanaAgregarAlPedidoSize {
+  width: 40rem;
+  height: 25rem;
+}
+
+.cotizacion-formulario {
+  width: 90%;
+  height: 80%;
+  overflow-y: scroll;
+}
+
+.sizeVentanaCotizar {
+  width: 50rem;
+  height: 60rem;
+}
+
+.contenedor-fechas-cotizacion {
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  row-gap: 2rem;
+  margin-bottom: 3rem;
+}
+
+.contenedor-articulo-formulario {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.contenedor-Campo-Eliminar {
+  display: flex;
+  align-items: center;
+  justify-content: end;
+  column-gap: 2rem;
+}
+
+.contenedorBuscadorHomeCliente {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  column-gap: 3rem;
+  margin: 2rem 0;
+}
+.contenedorBuscadorHomeCliente h3 {
+  font-size: 1.6rem;
+  margin: 0;
+  margin-bottom: 1rem;
+}
+
+.cotizacionView {
+  max-width: 40rem;
+  margin: 5rem;
+}
+
+.contenedorCalificacion {
+  width: 100%;
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: start;
+  column-gap: 0.5rem;
+}
+
+.comentarioFieldSize {
+  width: 40rem;
+  height: 8rem;
+}
+
+.contenedorComentarioTextArea {
+  display: flex;
+  align-items: start;
+  justify-content: start;
+  padding: 0 2rem;
+  column-gap: 1rem;
+  width: 100%;
+}
+.contenedorComentarioTextArea label {
+  padding-top: 1rem;
+}
+
+.comentario {
+  padding: 2rem 0;
+  margin: 0 2rem;
+  border-bottom: 1px solid #AEAEAF;
+}
+.comentario p {
+  margin: 0;
+  padding: 0 2rem;
+}
+.comentario .comentario-texto {
+  padding: 0 2rem;
+  margin-top: 1rem;
+}
+.comentario .fechaComentario {
+  color: #AEAEAF;
+  font-size: 1.4rem;
+}
+.comentario:last-child {
+  border-bottom: none;
 }
 
 /*# sourceMappingURL=app.css.map */

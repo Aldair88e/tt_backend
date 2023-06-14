@@ -15,15 +15,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include, re_path
-from usuarios.views import user_haveData, clienteRegistro, MypeRegistro
+from usuarios.views import user_haveData, clienteRegistro, MypeRegistro, ImagenView
 from dj_rest_auth.views import PasswordResetConfirmView
 from django_postalcodes_mexico import urls as django_postalcodes_mexico_urls
 from django.conf import settings
 from django.conf.urls.static import static
 from indexServerApp import views
-from GestionInventario.views import MobiliarioRegistro, MobiliarioMantenimientoView, MobiliarioShortview, MobiliarioPerdidoView, MobiliarioRentadoView
-from gestionClientes.views import ClientePorTelefonoView, ListaClientesView, ClientesShortView
-from gestionPedidos.views import PedidoView, CargoExtraView, PedidosEntregaView, GenerarPDFView
+from GestionInventario.views import MobiliarioRegistro, MobiliarioMantenimientoView, MobiliarioShortview, MobiliarioPerdidoView, MobiliarioRentadoView, getInventarioPDF
+from gestionClientes.views import ClientePorTelefonoView, ListaClientesView, ClientesShortView,getListaClientesPDF, getClientePDF
+from gestionPedidos.views import PedidoView, CargoExtraView, PedidosEntregaView, GenerarPDFView, getPedidoPDF
+from busquedaCotizacion import urls as busqueda_cotizacion_urls
 # from GestionInventario import views as InventarioViews
 
 react_routes = getattr(settings, 'REACT_ROUTES', [])
@@ -35,6 +36,7 @@ urlpatterns = [
     path('user/', user_haveData.as_view(), name='user'),
     path('cliente/registro', clienteRegistro.as_view(), name='clienteRegistro'),
     path('mype/registro', MypeRegistro.as_view(), name='MypeRegistro'),
+    path('put-imagen-mype/', ImagenView.as_view(), name='put-imagen-mype'),
     path('dj-rest-auth/password/reset/confirm/<str:uidb64>/<str:token>', PasswordResetConfirmView.as_view(),
             name='password_reset_confirm'),
     path('CP/', include(django_postalcodes_mexico_urls)),
@@ -44,13 +46,18 @@ urlpatterns = [
     path('api/mobiliario/short/', MobiliarioShortview.as_view(), name='mobiliario_short'),
     path('api/mobiliario/perdido/', MobiliarioPerdidoView.as_view(), name='mobiliario_perdido'),
     path('api/mobiliario/rentado/', MobiliarioRentadoView.as_view(), name='mobiliario_rentado'),
+    path('mobiliario/get-inventario-pdf/<int:userId>', getInventarioPDF, name='get-inventario-pdf'),
     path('api/gestion-clientes/', ClientePorTelefonoView.as_view(), name='gestion_clientes'),
+    path('gestion-clientes/lista-clientes-PDF/<int:userId>', getListaClientesPDF, name = 'lista-clientes-pdf'),
+    path('get-cliente-pdf/<int:userId>/<int:clienteId>', getClientePDF, name='get-cliente-pdf'),
     path('api/gestion-clientes/lista/', ListaClientesView.as_view(), name='lista_clientes'),
     path('api/gestion-clientes/clientes-short/', ClientesShortView.as_view(), name='Cliente_short'),
     path('api/gestion-pedidos/', PedidoView.as_view(), name='gestion-pedidos'),
     path('api/gestion-pedidos/cargos/', CargoExtraView.as_view(), name='cargos_extra'),
     path('api/gestion-pedidos/entrega/', PedidosEntregaView.as_view(), name='pedidos_por_entregar'),
     path('api/gestion-pedidos/pdf/', GenerarPDFView.as_view(), name='generar_pdf_pedido'),
+    path('get-pdf/<int:id>/<int:userId>', getPedidoPDF, name='get-pdf'),
+    path('api/busqueda-cotizacion/', include(busqueda_cotizacion_urls)),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 
 urlpatterns += static(settings.MEDIA_URL, document_root = settings.MEDIA_ROOT)

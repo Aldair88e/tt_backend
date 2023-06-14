@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+<div class="encabezado">
+
+    <h3 class="titulo">Reporte de inventario</h3>
+    <p class="text-center">{{empresa.nombreEmpresa}}</p>
+    {% for d in direccionMype %}
+        <p class="text-center">
+            {{d.calle}} #{{d.numExterior}}, {{d.colonia}}, {{d.ciudad}}, {{d.estado}}  
+        </p>
+    {% endfor %}
+    <p class="text-center">Teléfono: {{empresa.telefono}}</p>
+</div>
+<div class="info-cliente">
+    <p class="text-left">
+        Estado del inventario el dia: 
+        {%language 'es' %}
+            {{fecha}}
+        {%endlanguage%}
+    </p>
+</div>
+<table class="tabla">
+    <tr>
+        <th class="celda nombre">Artículo inventariado</th>
+        <th class="celda">Total</th>
+        <th class="celda">Disponible</th>
+        <th class="celda">En renta</th>
+        <th class="celda">En mantenimiento</th>
+        <th class="celda">Extraviados</th>
+        <th class="celda">Precio por pérdida</th>
+        <th class="celda">Precio de renta</th>
+        <th class="celda">Proveedor</th>
+    </tr>
+    {% for m in mobiliario %}
+        <tr>
+            <td class="celda">
+                {{m.nombre}}
+            </td>
+            <td class="celda center">
+                {{m.total}}
+            </td>
+            <td class="celda center">
+                {{m.disponible}}
+            </td>
+            <td class="celda center">
+                {{m.total_rentado|default_if_none:'0'}}
+            </td>
+            <td class="celda center">
+                {{m.total_mantenimiento|default_if_none:'0'}}                
+            </td>
+            <td class="celda center">
+                {{m.total_perdido|default_if_none:'0'}}
+            </td>
+            <td class="celda center">
+                $ {{m.precioCompra|default_if_none:'0'}}
+            </td>
+            <td class="celda center">
+                $ {{m.precioRenta|default_if_none:'0'}}
+            </td>
+            <td class="celda">
+                {{m.proveedor|default_if_none:'-'}}
+            </td>
+        </tr>
+    {%endfor%}
+    <!-- {% for c in cargosExtra %}
+        <tr>
+            <td class="celda grande">
+                {{c.concepto}}
+            </td>
+            <td class="celda">
+                <div class="derecha">
+                    1
+                </div>
+            </td>
+            <td class="celda celdaLeft">
+                <div class="nombre">
+                    $
+                </div>
+            </td>
+            <td class="celda celdaRigth">
+                <div class="derecha">
+                    {{c.precio}}
+                </div>
+            </td>
+            <td class="celda celdaLeft">
+                <div class="nombre">
+                    $
+                </div>
+            </td>
+            <td class="celda celdaRigth">
+                <div class="derecha">
+                    {{c.precio}}
+                </div>
+            </td>
+        </tr>
+    {%endfor%}
+    <tr>
+        <td class="celda"></td>
+        <td class="celda" colspan="3"><b>Total</b></td>
+        <td class="celda celdaLeft">
+            <div class="nombre">$</div>
+        </td>
+        <td class="celda celdaRigth" >
+            <div class="derecha">{{total}}</div>
+        </td>
+    </tr>
+    <tr>
+        <td class="celda"></td>
+        <td class="celda" colspan="3"><b>Pago recibido</b></td>
+        <td class="celda celdaLeft">
+            <div class="nombre">$</div>
+        </td>
+        <td class="celda celdaRigth" >
+            <div class="derecha">{{pedido.pagoRecibido}}</div>
+        </td>
+    </tr>
+    <tr>
+        <td class="celda"></td>
+        <td class="celda" colspan="3"><b>Adeudo</b></td>
+        <td class="celda celdaLeft">
+            <div class="nombre">$</div>
+        </td>
+        <td class="celda celdaRigth" >
+            <div class="derecha">{{adeudo}}</div>
+        </td>
+    </tr> -->
+</table>
+<!-- <div class="notas">
+    <p>Nota:{{pedido.notas}}</p>
+</div>
+<div class="agradecimiento">
+    <p>¡Gracias por su preferencia!</p>
+</div> -->
+{% endblock %}
