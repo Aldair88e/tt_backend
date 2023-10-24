@@ -24,7 +24,7 @@ idna==2.10
 importlib-metadata==5.1.0
 Markdown==3.4.1
 oauthlib==3.2.2
-Pillow==9.4.0
+Pillow>=10.0.1
 psycopg2-binary==2.9.5
 pycparser==2.21
 pydyf==0.6.0
